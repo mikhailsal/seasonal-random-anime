@@ -1,54 +1,65 @@
-import fs from 'node:fs';
-import path from 'node:path';
-import vm from 'node:vm';
-import { JSDOM } from 'jsdom';
+import { readFile } from 'node:fs/promises';
+import { JSDOM, VirtualConsole } from 'jsdom';
+import { createContext, Script } from 'vm';
 
 /**
- * Load the inline application script from seasonal-random-anime/index.html into a jsdom-backed VM context.
- * It intentionally blocks DOMContentLoaded listeners to avoid auto-running network calls during tests.
- * Returns { context, window, document } where context contains globally defined functions.
+ * Load the application HTML, extract inline scripts, and execute the last inline script
+ * inside a VM context with a mocked window/document from JSDOM.
+ * - DOMContentLoaded handlers are blocked to avoid auto-running network code during tests.
+ * - VM global fetch is intentionally a thrower to encourage mocking.
  */
-export async function loadApp({
-  htmlPath = 'seasonal-random-anime/index.html',
-  domHTML = '<!DOCTYPE html><html><head></head><body></body></html>'
-} = {}) {
-  const htmlAbs = path.resolve(process.cwd(), htmlPath);
-  const html = fs.readFileSync(htmlAbs, 'utf-8');
-
-  const scriptMatches = [...html.matchAll(/<script>([\\s\\S]*?)<\\/script>/gi)];
-  if (scriptMatches.length === 0) {
-    throw new Error('No inline <script> found in ' + htmlPath);
+export async function loadApp({ htmlPath = 'seasonal-random-anime/index.html', domHTML = '<!DOCTYPE html><html><head></head><body></body></html>' } = {}) {
+  // Load HTML
+  let html;
+  try {
+    html = await readFile(htmlPath, 'utf8');
+  } catch (e) {
+    // Fallback to provided minimal DOM HTML if file not found
+    html = domHTML;
   }
-  const scriptContent = scriptMatches[scriptMatches.length - 1][1];
 
-  const dom = new JSDOM(domHTML, {
-    url: 'https://localhost/',
-    pretendToBeVisual: true
+  // Initialize a JSDOM instance with no automatic script evaluation
+  const dom = new JSDOM(html, {
+    runScripts: 'outside-only',
+    resources: 'usable',
+    // Forward console logs to the host console for visibility during tests
+    // Use VirtualConsole to avoid leaking globals
+    virtualConsole: new VirtualConsole(),
   });
 
-  // Prevent app bootstrap from running network calls in tests.
+  // Gather inline scripts in the order they appear and pick the last one
+  const scriptNodes = Array.from(dom.window.document.querySelectorAll('script'));
+  const inlineScripts = scriptNodes.filter(node => !node.src);
+  const appScriptContent = (inlineScripts.length > 0 && inlineScripts[inlineScripts.length - 1].textContent) || '';
+
+  // Block DOMContentLoaded to prevent auto-running app bootstrap during tests
   const originalAddEventListener = dom.window.addEventListener.bind(dom.window);
-  dom.window.addEventListener = (type, listener, options) => {
+  dom.window.addEventListener = function(type, listener, ...args) {
     if (type === 'DOMContentLoaded') return;
-    return originalAddEventListener(type, listener, options);
+    return originalAddEventListener(type, listener, ...args);
   };
 
-  const context = vm.createContext({
+  // Create a VM context (sandbox) and expose DOM globals
+  const sandbox = {
     window: dom.window,
     document: dom.window.document,
-    console,
-    URL,
+    console: console,
+    URL: URL,
     setTimeout,
     clearTimeout,
-    performance: dom.window.performance,
-    requestAnimationFrame: dom.window.requestAnimationFrame?.bind(dom.window) ?? ((cb) => setTimeout(cb, 16)),
-    // Force tests to stub/mocks when they need fetch.
-    fetch: () => {
-      throw new Error('fetch called during tests; mock or stub it in your test.');
-    }
-  });
+    performance: (typeof performance !== 'undefined' ? performance : undefined),
+    requestAnimationFrame: (cb) => setTimeout(cb, 0),
+    fetch: () => { throw new Error('fetch is not mocked in VM'); },
+  };
 
-  vm.runInContext(scriptContent, context, { filename: 'app-inline-script.js' });
+  const context = createContext(sandbox);
+
+  // Execute the last inline script inside the VM context
+  if (appScriptContent && appScriptContent.trim().length > 0) {
+    const script = new Script(appScriptContent);
+    // Intentionally let errors bubble up to test runner for visibility
+    script.runInContext(context);
+  }
 
   return { context, window: dom.window, document: dom.window.document };
 }

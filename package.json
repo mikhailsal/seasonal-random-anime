@@ -4,7 +4,9 @@
   "main": "index.js",
   "scripts": {
     "test": "vitest --run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:unit": "vitest --run test/unit",
+    "test:integration": "vitest --run test/integration"
   },
   "repository": {
     "type": "git",
