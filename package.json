@@ -1,0 +1,26 @@
+{
+  "name": "seasonal-random-anime",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "vitest --run",
+    "test:watch": "vitest"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mikhailsal/seasonal-random-anime.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/mikhailsal/seasonal-random-anime/issues"
+  },
+  "homepage": "https://github.com/mikhailsal/seasonal-random-anime#readme",
+  "description": "",
+  "type": "module",
+  "devDependencies": {
+    "jsdom": "^26.1.0",
+    "vitest": "^3.2.4"
+  }
+}
