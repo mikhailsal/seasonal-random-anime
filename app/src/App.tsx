@@ -10,7 +10,7 @@ export type AppDeps = {
     getSeason: (year: number, season: SeasonName, opts?: { limit?: number }) => Promise<{ data: Anime[] }>;
   };
   selectors: {
-    pickRandomConsideringContinuity: (list: Anime[], opts?: { rng?: () => number }) => Anime | null;
+    pickRandomConsideringContinuity: (list: Anime[], opts?: { rng?: () => number }) => Promise<Anime | null>;
   };
   rng?: () => number;
 };
@@ -24,10 +24,8 @@ const defaultDeps: AppDeps = {
     }
   },
   selectors: {
-    pickRandomConsideringContinuity: (list, opts) => {
-      // Cast to broad signature to avoid tight coupling with internal implementation details
-      const fn = realPick as unknown as (l: Anime[], o?: { rng?: () => number }) => Anime | null;
-      const pick = fn(list, { rng: opts?.rng });
+    pickRandomConsideringContinuity: async (list, opts) => {
+      const pick = await realPick(list, { rng: opts?.rng });
       return pick;
     }
   },
@@ -87,9 +85,9 @@ export function App(props: { deps?: Partial<AppDeps> } = {}) {
     };
   }, [year, season, deps.services]);
 
-  function onRandom() {
+  async function onRandom() {
     if (!items.length) return;
-    const pick = deps.selectors.pickRandomConsideringContinuity(items, { rng: deps.rng });
+    const pick = await deps.selectors.pickRandomConsideringContinuity(items, { rng: deps.rng });
     if (pick) setSelected(pick);
   }
 

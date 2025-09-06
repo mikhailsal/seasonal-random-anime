@@ -97,4 +97,39 @@ describe('App UI', () => {
     expect(await screen.findByText(/Loaded: 1/)).toBeInTheDocument(); // second load
     expect(getSeason).toHaveBeenCalledTimes(2);
   });
+
+  it('should handle async selector correctly (REGRESSION TEST)', async () => {
+    const user = userEvent.setup();
+
+    const dataset = [makeAnime(1, 'Anime Title Test'), makeAnime(2, 'Another Anime')];
+
+    const deps: Partial<AppDeps> = {
+      services: {
+        getSeason: vi.fn().mockResolvedValue({ data: dataset })
+      },
+      // Use the real async selector to catch the Promise bug
+      selectors: {
+        pickRandomConsideringContinuity: async (list: Anime[]) => {
+          // Return first item for predictable test
+          return list[0] ?? null;
+        }
+      }
+    };
+
+    await act(async () => {
+      render(<App deps={deps} />);
+    });
+
+    expect(await screen.findByText(/Loaded: 2/)).toBeInTheDocument();
+
+    const btn = screen.getByRole('button', { name: 'pick-random' });
+    await act(async () => {
+      await user.click(btn);
+    });
+
+    // This should pass once the async bug is fixed
+    // It will fail before the fix because selected will be a Promise
+    expect(screen.getByLabelText('anime-card')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Anime Title Test' })).toBeInTheDocument();
+  });
 });
