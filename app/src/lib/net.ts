@@ -60,40 +60,11 @@ export async function fetchWithRetry(
     const signal = controller.signal;
     const timeoutHandle = setTimeout(() => controller.abort(), timeoutMs);
 
+    let response: Response | null = null;
+
     try {
-      const response = await fetchImpl(input, { ...(fetchInitRest as RequestInit), signal });
-
+      response = await fetchImpl(input, { ...(fetchInitRest as RequestInit), signal });
       clearTimeout(timeoutHandle);
-
-      if (response && (response as any).ok) {
-        return response;
-      }
-
-      const status = (response as any).status;
-      lastStatus = status;
-
-      // If status is explicitly retryable
-      if (retryOn.includes(status)) {
-        // call onRetry before sleeping/retrying
-        onRetry?.(attempt, status);
-        // compute delay only if we will attempt again
-        if (attempt < retries) {
-          const backoff = baseDelayMs * Math.pow(2, attempt - 1);
-          const extra = jitter ? Math.floor(Math.random() * baseDelayMs) : 0;
-          await delay(backoff + extra);
-          continue;
-        }
-        // exhausted attempts -> throw HTTP error
-        throw new Error(`HTTP ${status}`);
-      }
-
-      // Do not retry on other 4xx
-      if (status >= 400 && status < 500) {
-        throw new Error(`HTTP ${status}`);
-      }
-
-      // Other statuses (non-ok, non-4xx) -> treat as error and do not retry unless explicitly listed
-      throw new Error(`HTTP ${status}`);
     } catch (err: any) {
       clearTimeout(timeoutHandle);
 
@@ -120,6 +91,37 @@ export async function fetchWithRetry(
       // Exhausted attempts -> throw last network error
       throw lastError;
     }
+
+    if (response && (response as any).ok) {
+      return response;
+    }
+
+    const status = (response as any).status;
+    lastStatus = status;
+
+    // If status is explicitly retryable
+    if (retryOn.includes(status)) {
+      // compute delay only if we will attempt again
+      if (attempt < retries) {
+        // call onRetry before sleeping/retrying
+        onRetry?.(attempt, status);
+        const backoff = baseDelayMs * Math.pow(2, attempt - 1);
+        const extra = jitter ? Math.floor(Math.random() * baseDelayMs) : 0;
+        await delay(backoff + extra);
+        continue;
+      }
+      // exhausted attempts -> throw HTTP error
+      throw new Error(`HTTP ${status}`);
+    }
+
+    // Do not retry on other 4xx
+    if (status >= 400 && status < 500) {
+      const error = new Error(`HTTP ${status}`);
+      throw error;
+    }
+
+    // Other statuses (non-ok, non-4xx) -> treat as error and do not retry unless explicitly listed
+    throw new Error(`HTTP ${status}`);
   }
 
   // Defensive fallback (shouldn't reach here)

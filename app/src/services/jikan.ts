@@ -32,12 +32,20 @@ export async function getSeason(
   const { limit } = params || {};
   const { fetchImpl, retries, baseDelayMs, timeoutMs, onRetry } = params || {};
   const qs = typeof limit === 'number' ? `?limit=${encodeURIComponent(String(limit))}` : '';
-  const res = await fetchWithRetry(`${JIKAN_BASE}/seasons/${year}/${season}${qs}`, {
+  const url = `${JIKAN_BASE}/seasons/${year}/${season}${qs}`;
+
+  const res = await fetchWithRetry(url, {
     fetchImpl,
     retries,
     baseDelayMs,
     timeoutMs,
     onRetry,
   } as FetchWithRetryOptions);
-  return res.json() as Promise<SeasonAnimePageResponse>;
+
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}`);
+  }
+
+  const data = await res.json();
+  return data as SeasonAnimePageResponse;
 }

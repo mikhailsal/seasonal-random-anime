@@ -27,7 +27,8 @@ const defaultDeps: AppDeps = {
     pickRandomConsideringContinuity: (list, opts) => {
       // Cast to broad signature to avoid tight coupling with internal implementation details
       const fn = realPick as unknown as (l: Anime[], o?: { rng?: () => number }) => Anime | null;
-      return fn(list, { rng: opts?.rng });
+      const pick = fn(list, { rng: opts?.rng });
+      return pick;
     }
   },
   rng: Math.random

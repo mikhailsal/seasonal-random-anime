@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import React from 'react';
 import { App, AppDeps } from './App';
@@ -23,11 +23,13 @@ describe('App UI', () => {
       }
     };
 
-    render(<App deps={deps} />);
+    await act(async () => {
+      render(<App deps={deps} />);
+    });
 
     expect(await screen.findByText(/Loaded: 3/)).toBeInTheDocument();
 
-    const btn = screen.getByRole('button', { name: /pick random/i });
+    const btn = screen.getByRole('button', { name: 'pick-random' });
     await user.click(btn);
 
     expect(screen.getByLabelText('anime-card')).toBeInTheDocument();
@@ -35,23 +37,37 @@ describe('App UI', () => {
   });
 
   it('shows loading and error states', async () => {
+    let resolveGetSeason: (value: any) => void;
+    const getSeason = vi.fn().mockImplementation(() => {
+      return new Promise((resolve, reject) => {
+        resolveGetSeason = () => reject(new Error('boom'));
+      });
+    });
+
     const deps: Partial<AppDeps> = {
-      services: {
-        getSeason: vi.fn().mockRejectedValue(new Error('boom'))
-      },
+      services: { getSeason },
       selectors: {
         pickRandomConsideringContinuity: vi.fn(() => null)
       }
     };
 
-    render(<App deps={deps} />);
+    await act(async () => {
+      render(<App deps={deps} />);
+    });
 
-    // Loading then error
+    // Should show loading initially
     expect(screen.getByText(/loading/i)).toBeInTheDocument();
+
+    // Trigger the error
+    await act(async () => {
+      resolveGetSeason!(null);
+    });
+
+    // Should show error after loading
     expect(await screen.findByText(/Error: boom/)).toBeInTheDocument();
 
     // Random button disabled when no items
-    const btn = screen.getByRole('button', { name: /pick random/i });
+    const btn = screen.getByRole('button', { name: 'pick-random' });
     expect(btn).toBeDisabled();
   });
 
@@ -67,12 +83,16 @@ describe('App UI', () => {
       selectors: { pickRandomConsideringContinuity: vi.fn(() => null) }
     };
 
-    render(<App deps={deps} />);
+    await act(async () => {
+      render(<App deps={deps} />);
+    });
 
     expect(await screen.findByText(/Loaded: 1/)).toBeInTheDocument();
 
     const seasonSelect = screen.getByLabelText('season-select');
-    await user.selectOptions(seasonSelect, 'spring');
+    await act(async () => {
+      await user.selectOptions(seasonSelect, 'spring');
+    });
 
     expect(await screen.findByText(/Loaded: 1/)).toBeInTheDocument(); // second load
     expect(getSeason).toHaveBeenCalledTimes(2);

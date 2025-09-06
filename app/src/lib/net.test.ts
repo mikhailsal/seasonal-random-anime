@@ -62,18 +62,27 @@ describe('fetchWithRetry', () => {
   });
 
   it('does not retry on 400 and throws HTTP 400', async () => {
+    // This test doesn't need fake timers - disable them for this specific test
+    vi.useRealTimers();
+
     const rawFetchImpl = () => Promise.resolve({ ok: false, status: 400 } as unknown as Response);
     const fetchImpl = vi.fn(rawFetchImpl) as unknown as (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 
-    await expect(
-      fetchWithRetry('http://example', {
+    try {
+      await fetchWithRetry('http://example', {
         fetchImpl,
         retries: 3,
         baseDelayMs: 10,
-      })
-    ).rejects.toThrow('HTTP 400');
+      });
+      throw new Error('Expected to throw');
+    } catch (error: any) {
+      expect(error.message).toBe('HTTP 400');
+    }
 
     expect(fetchImpl).toHaveBeenCalledTimes(1);
+
+    // Restore fake timers for other tests
+    vi.useFakeTimers();
   });
 
   it('aborts on timeoutMs and results in AbortError', async () => {
@@ -105,11 +114,16 @@ describe('fetchWithRetry', () => {
       baseDelayMs: 10,
     });
 
+    // Create a promise that handles the rejection properly
+    const resultPromise = p.catch(err => err);
+
     // advance time to trigger timeout abort
     await vi.advanceTimersByTimeAsync(100);
     await Promise.resolve();
 
-    await expect(p).rejects.toMatchObject({ name: 'AbortError' });
+    // Now properly await the rejection
+    const result = await resultPromise;
+    expect(result).toMatchObject({ name: 'AbortError' });
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 

@@ -41,6 +41,9 @@ describe('jikan service', () => {
 
     const p = getSeasons({ fetchImpl, retries: 3, baseDelayMs: 10, onRetry });
 
+    // Create a promise that handles the rejection properly
+    const resultPromise = p.catch(err => err);
+
     // initial attempt
     await Promise.resolve();
     expect(fetchImpl).toHaveBeenCalledTimes(1);
@@ -57,7 +60,10 @@ describe('jikan service', () => {
     await Promise.resolve();
     expect(fetchImpl).toHaveBeenCalledTimes(3);
 
-    await expect(p).rejects.toThrow('HTTP 503');
+    // Now properly await the rejection
+    const result = await resultPromise;
+    expect(result).toBeInstanceOf(Error);
+    expect((result as Error).message).toBe('HTTP 503');
 
     // onRetry should have been called for attempts 1 and 2 (not for final failed attempt)
     expect(onRetry).toHaveBeenCalledTimes(2);
