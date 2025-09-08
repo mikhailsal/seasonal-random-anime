@@ -5,9 +5,7 @@ on:
     types: [opened, synchronize, reopened]
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
   pull-requests: write
 
 concurrency:
@@ -15,7 +13,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
+  build-and-deploy:
     if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
     steps:
@@ -31,42 +29,35 @@ jobs:
         working-directory: app
         run: npm ci
 
-      - name: Build (preview base for nested path)
+      - name: Build (relative base for nested preview path)
         working-directory: app
         run: npm run build -- --base=./
 
-      - name: Include legacy app in artifact
+      - name: Include legacy app
         run: mkdir -p app/dist/legacy && cp seasonal-random-anime/index.html app/dist/legacy/index.html
 
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+      - name: Deploy PR preview to gh-pages under previews/pr-N
+        uses: JamesIves/github-pages-deploy-action@v4
         with:
-          path: app/dist
-
-  deploy:
-    if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
-    runs-on: ubuntu-latest
-    needs: build
-    outputs:
-      page_url: ${{ steps.deployment.outputs.page_url }}
-      preview_url: ${{ steps.deployment.outputs.preview_url }}
-    steps:
-      - name: Deploy to GitHub Pages (preview)
-        id: deployment
-        uses: actions/deploy-pages@v4
-        with:
-          preview: true
+          branch: gh-pages
+          folder: app/dist
+          target-folder: previews/pr-${{ github.event.pull_request.number }}
+          clean: false
+          clean-exclude: |
+            previews/**
+          single-commit: false
 
   comment:
     if: ${{ always() && github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
-    needs: deploy
+    needs: build-and-deploy
     steps:
       - name: Comment preview URL on PR
         uses: actions/github-script@v7
         with:
           script: |
-            const url = process.env.PREVIEW_URL || process.env.PAGE_URL;
+            const pr = context.issue.number;
+            const url = `https://${context.repo.owner}.github.io/${context.repo.repo}/previews/pr-${pr}/`;
             const body = `✅ Preview deployed: ${url}`;
             await github.rest.issues.createComment({
               owner: context.repo.owner,
@@ -74,8 +65,6 @@ jobs:
               issue_number: context.issue.number,
               body
             });
-        env:
-          PAGE_URL: ${{ needs.deploy.outputs.page_url }}
-          PREVIEW_URL: ${{ needs.deploy.outputs.preview_url }}
+        env: {}
 
 
