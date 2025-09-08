@@ -1,0 +1,11 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# How to be succesfull with running tests
+- You must run tests after making code changes
+- Do not end your turn until tests are passed
+- Fix errors if tests fail
+- First run the specific test
+- If it is ok, run all tests at once

@@ -1,0 +1,8 @@
+---
+description: you must read if user skip your terminal execution
+globs: 
+alwaysApply: false
+---
+# there are ONLY 2 reasons to do that
+- your command is invalid or prohibiting your rules, check rules and try in another way
+- the command was hang, so you need to fix that and add a check for possible hanging

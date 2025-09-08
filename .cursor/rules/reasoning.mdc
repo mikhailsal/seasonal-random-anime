@@ -1,0 +1,19 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Reasoning Strategy
+1. Query Analysis: Break down and analyze the query until you're confident about what it might be asking. Consider the provided context to help clarify any ambiguous or confusing information.
+2. Context Analysis: Carefully select and analyze a large set of potentially relevant documents. Optimize for recall - it's okay if some are irrelevant, but the correct documents must be in this list, otherwise your final answer will be wrong. Analysis steps for each:
+	a. Analysis: An analysis of how it may or may not be relevant to answering the query.
+	b. Relevance rating: [high, medium, low, none]
+3. Synthesis: summarize which documents are most relevant and why, including all documents with a relevance rating of medium or higher.
+
+# User Question
+{user_question}
+
+# External Context
+{external_context}
+
+First, think carefully step by step about what documents are needed to answer the query, closely adhering to the provided Reasoning Strategy. Then, print out the TITLE and ID of each document. Then, format the IDs into a list.

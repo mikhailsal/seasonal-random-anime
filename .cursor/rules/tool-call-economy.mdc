@@ -1,0 +1,323 @@
+---
+alwaysApply: false
+---
+# Tool Call Economy - Maximizing the Efficiency of Tool Calls
+
+## Core Principles
+
+1.  **One Call - Maximum Information**: Strive to get as much data as possible in a single tool call.
+2.  **Parallel Calls**: Use multiple tool calls simultaneously whenever possible.
+3.  **Command Combination**: Combine several operations into one command using `&&` or `;`.
+4.  **Debugging Code in Terminal**: Write Python/bash scripts directly in the terminal for data exploration.
+5.  **Efficient File Editing**: Use `search_replace` for simple changes and `edit_file` for multiple edits in one call.
+
+## File Editing Economy
+
+### Use `search_replace` When Possible
+For simple text replacements, especially when you need to change a specific string or pattern, use `search_replace` instead of `edit_file`:
+
+```bash
+# ✅ Good - direct replacement
+search_replace(file_path="config.py", 
+               old_string="DEBUG = False", 
+               new_string="DEBUG = True")
+
+# ❌ Bad - unnecessary edit_file for simple replacement
+edit_file(target_file="config.py", 
+          code_edit="DEBUG = True\n// ... existing code ...")
+```
+
+### Batch Multiple Edits in One `edit_file` Call
+When you need to make multiple changes to different parts of the same file, combine them all into a single `edit_file` call:
+
+```bash
+# ✅ CORRECT - Multiple edits in one call
+edit_file(target_file="app.py", code_edit="
+import os
+import json
+// ... existing code ...
+def process_data(data):
+    # Updated logic here
+    return processed_data
+// ... existing code ...
+class DataProcessor:
+    def __init__(self, config):
+        self.config = config
+        self.cache = {}  # Added cache
+// ... existing code ...
+    def validate_input(self, input_data):
+        # New validation logic
+        if not input_data:
+            raise ValueError('Input cannot be empty')
+        return True
+// ... existing code ...
+")
+
+# ❌ INCORRECT - Multiple separate edit_file calls
+edit_file(target_file="app.py", code_edit="import os\nimport json")
+edit_file(target_file="app.py", code_edit="def process_data(data):\n    return processed_data")
+edit_file(target_file="app.py", code_edit="self.cache = {}  # Added cache")
+edit_file(target_file="app.py", code_edit="def validate_input...")
+```
+
+### Choose the Right Tool for the Job
+
+| Scenario | Tool | Reason |
+|----------|------|--------|
+| Single string replacement | `search_replace` | More precise, less overhead |
+| Multiple unrelated changes | `edit_file` (one call) | Batch processing |
+| Adding imports + functions + classes | `edit_file` (one call) | Complex structural changes |
+| Changing one configuration value | `search_replace` | Simple and direct |
+| Refactoring multiple methods | `edit_file` (one call) | Related changes together |
+
+### Examples of Efficient Editing
+
+#### ✅ Good - Configuration Update
+```bash
+# Simple value change
+search_replace(file_path="settings.json",
+               old_string='"timeout": 30',
+               new_string='"timeout": 60')
+```
+
+#### ✅ Good - Multiple Related Changes
+```bash
+# Adding error handling throughout a file
+edit_file(target_file="api_client.py", code_edit="
+import requests
+import logging
+from typing import Optional, Dict, Any
+// ... existing code ...
+def fetch_data(self, endpoint: str) -> Optional[Dict[Any, Any]]:
+    try:
+        response = requests.get(f'{self.base_url}/{endpoint}')
+        response.raise_for_status()
+        return response.json()
+    except requests.RequestException as e:
+        logging.error(f'API request failed: {e}')
+        return None
+// ... existing code ...
+def post_data(self, endpoint: str, data: Dict[Any, Any]) -> bool:
+    try:
+        response = requests.post(f'{self.base_url}/{endpoint}', json=data)
+        response.raise_for_status()
+        return True
+    except requests.RequestException as e:
+        logging.error(f'API post failed: {e}')
+        return False
+// ... existing code ...
+")
+```
+
+#### ❌ Bad - Inefficient Multiple Calls
+```bash
+# DON'T DO THIS
+search_replace(file_path="api_client.py", old_string="import requests", new_string="import requests\nimport logging")
+edit_file(target_file="api_client.py", code_edit="try:\n    response = requests.get...")
+edit_file(target_file="api_client.py", code_edit="except requests.RequestException...")
+# ... more separate calls
+```
+
+## Technique: Python Debugging Code in Terminal
+
+### ✅ CORRECT - Database Exploration in One Call:
+```bash
+python3 -c "
+import sqlite3
+import json
+from pathlib import Path
+
+# Explore data structure
+db_path = Path.home() / '.config' / 'Cursor' / 'User' / 'globalStorage' / 'state.vscdb'
+conn = sqlite3.connect(db_path)
+cursor = conn.cursor()
+
+# Get a few examples and analyze them
+cursor.execute('SELECT key, value FROM table WHERE condition LIMIT 5')
+results = cursor.fetchall()
+
+print('=== STRUCTURE ANALYSIS ===')
+for i, (key, value) in enumerate(results):
+    try:
+        data = json.loads(value)
+        print(f'Record {i+1}:')
+        print('Available fields:', list(data.keys()))
+        
+        # Look for fields of interest
+        for field_name, field_value in data.items():
+            if 'search_word' in field_name.lower():
+                print(f'  {field_name}: {field_value}')
+    except:
+        continue
+
+conn.close()
+"
+```
+
+### ❌ INCORRECT - Multiple Separate Calls:
+```bash
+# DON'T DO THIS - it's wasteful
+python3 -c "import sqlite3; print('connecting...')"
+python3 -c "conn = sqlite3.connect('db'); cursor = conn.cursor()"
+python3 -c "cursor.execute('SELECT * FROM table')"
+# ... and so on
+```
+
+## Tool Call Saving Strategies
+
+### 1. Combining Terminal Commands
+```bash
+# ✅ Good - all in one command
+cd /path/to/project && ls -la | head -10 && grep -r "pattern" . | head -5 && python3 -c "print('analysis complete')"
+
+# ❌ Bad - separate commands
+cd /path/to/project
+ls -la
+grep -r "pattern" .
+```
+
+### 2. Parallel Searches
+```bash
+# ✅ Use multiple grep_search simultaneously
+grep_search("token|usage|cost")  # Several patterns at once
+grep_search("bubble_data\.get|message\.get")  # All field extractions
+grep_search("timing|performance|metrics")  # Related concepts
+```
+
+### 3. Exhaustive File Reading
+```bash
+# ✅ Read the entire file if you need to understand the structure
+read_file(target_file, should_read_entire_file=True)
+
+# ❌ Do not read in parts unnecessarily
+read_file(target_file, start_line=1, end_line=50)
+read_file(target_file, start_line=51, end_line=100)  # Wasteful
+```
+
+### 4. Smart Use of Terminal for Analysis
+```bash
+# ✅ Comprehensive analysis in one call
+python3 -c "
+# Imports
+import os, json, sqlite3, re
+from pathlib import Path
+from collections import defaultdict
+
+# Analysis 1: File Structure
+print('=== FILE STRUCTURE ===')
+for root, dirs, files in os.walk('.'):
+    if 'target_pattern' in root:
+        print(f'{root}: {len(files)} files')
+
+# Analysis 2: Database Search  
+print('=== DB ANALYSIS ===')
+# ... code for DB
+
+# Analysis 3: Statistics
+print('=== STATISTICS ===')
+# ... data counting
+
+print('Analysis complete')
+"
+```
+
+### 5. Efficient Codebase Search
+```bash
+# ✅ Use regular expressions for broad search
+grep_search("(token|usage|cost|billing|metric)")  # One search instead of five
+
+# ✅ Search for usage patterns
+grep_search("\.get\('(token|usage|cost)')  # Specific extraction patterns
+
+# ✅ Combine related searches
+codebase_search("token usage statistics")  # Semantic search
+grep_search("tokenCount|inputTokens|outputTokens")  # Exact fields
+```
+
+### 6. Debugging and Data Exploration
+```bash
+# ✅ Create mini-scripts for exploration
+python3 -c "
+# JSON structure exploration
+import json
+sample_data = '''{"your": "json", "here": true}'''
+data = json.loads(sample_data)
+
+# Analyze all fields
+def analyze_dict(d, prefix=''):
+    for k, v in d.items():
+        print(f'{prefix}{k}: {type(v).__name__}')
+        if isinstance(v, dict) and len(str(v)) < 200:
+            analyze_dict(v, prefix + '  ')
+        elif isinstance(v, list) and v:
+            print(f'{prefix}  [0]: {type(v[0]).__name__}')
+
+analyze_dict(data)
+"
+```
+
+### 7. Efficient File Editing Strategy
+```bash
+# ✅ Plan all edits before executing
+# 1. Identify all changes needed
+# 2. Group by file
+# 3. Use search_replace for simple changes
+# 4. Use edit_file for complex/multiple changes per file
+# 5. Execute all file edits in parallel when possible
+```
+
+## Practical Examples
+
+### Cursor Token Research (real example):
+```bash
+# All necessary information obtained in one call
+python3 -c "
+import sqlite3, json
+from pathlib import Path
+
+global_db = Path.home() / '.config' / 'Cursor' / 'User' / 'globalStorage' / 'state.vscdb'
+conn = sqlite3.connect(global_db)
+cursor = conn.cursor()
+
+# Look for token examples
+cursor.execute('SELECT key, value FROM cursorDiskKV WHERE key LIKE \"bubbleId:%\" LIMIT 10')
+results = cursor.fetchall()
+
+print('=== TOKEN SEARCH ===')
+for key, value in results:
+    try:
+        data = json.loads(value)
+        if 'tokenCount' in data:
+            tokens = data['tokenCount']
+            print(f'Tokens found: {tokens}')
+            print(f'Available fields: {list(data.keys())}')
+            break
+    except:
+        continue
+
+conn.close()
+"
+```
+
+## What NOT to do
+
+❌ **Avoid sequential dependent calls unnecessarily**
+❌ **Do not read files in small parts**
+❌ **Do not perform separate searches for related terms**
+❌ **Do not use multiple simple commands instead of one complex one**
+❌ **Do not make multiple edit_file calls to the same file**
+❌ **Do not use edit_file for simple string replacements**
+❌ **Do not edit files one change at a time when multiple changes are needed**
+
+## Checklist before tool call
+
+1.  Can this information be obtained in one request?
+2.  Can multiple commands be combined using `&&`?
+3.  Can a Python script be written directly in the terminal?
+4.  Can parallel calls be used?
+5.  Is my search/analysis broad enough?
+6.  **For file editing: Can I use `search_replace` instead of `edit_file`?**
+7.  **For file editing: Can I batch multiple changes into one `edit_file` call?**
+8.  **For multiple files: Can I edit them in parallel?**
+
+**Remember: Every tool call costs time. Maximize the benefit from each call!**

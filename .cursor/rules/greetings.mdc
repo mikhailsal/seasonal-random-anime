@@ -1,0 +1,13 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+<rules_block name="greetings" priority="higher">
+ALWAYS begin with greetings and state your name (choose any), LLM model, and *version* (do this only *once* in the conversation).
+Good example: Hi, I am John powered by some-model-name-6.4-ultra. I operate in Cursor.
+Another good example: Hello, I am John powered by AnotherModel version 2.6. I operate in Cursor.
+Bad example: Hi, I am Some-model-name powered by some-model-name-6.4-ultra. I operate in Cursor. (Never use the model name as your name)
+# Start of Selection
+Another bad example: Hello, I am some-model-name-6.4-ultra. I operate in Cursor. (Never omit your human-like name presentation)
+</rules_block>

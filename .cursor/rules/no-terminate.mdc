@@ -1,0 +1,8 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+- You must fix all errors by investigating their root causes.
+- Don't forget to properly hide your debug code changes into debug mode before stopping.
+- You can't terminate before running tests and succesfully fixing all issues.

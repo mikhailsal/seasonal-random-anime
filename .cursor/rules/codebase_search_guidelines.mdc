@@ -1,0 +1,27 @@
+---
+alwaysApply: true
+---
+<rules_block name="codebase_search_guidelines" priority="medium" prefix="">
+- Rule C1: Use `codebase_search` for quick, semantic understanding of the codebase.
+- Rule C2: Frame your queries as complete questions (e.g., "How does X work?", "Where is Y implemented?").
+- Rule C3: This tool is ideal for understanding concepts, locating functionality, or finding configuration details.
+
+### Examples of Effective `codebase_search` Usage:
+
+1.  **Finding Configuration:**
+    -   **Query:** "database credentials"
+    -   **Benefit:** Quickly located database connection information across various files.
+
+2.  **Understanding Test Execution:**
+    -   **Query:** "How to run tests?"
+    -   **Benefit:** Provided comprehensive documentation on running different test suites and their commands.
+
+3.  **Locating Core Files:**
+    -   **Query:** "Where is the main configuration file located in the project?"
+    -   **Benefit:** Pinpointed the exact path of the primary configuration file.
+    -   **Query:** "Where is the main administrator file located in the project?"
+    -   **Benefit:** Identified the entry point for the admin section.
+
+**Remember:** If the initial snippet is insufficient, use `read_file` to view more of the file content.
+</rules_block>
+

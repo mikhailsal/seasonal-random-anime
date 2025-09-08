@@ -1,0 +1,6 @@
+---
+alwaysApply: false
+---
+- create a new test case for code modification you make
+- you should also update existing test cases if needed
+- don't forget to add negative test cases to check that error handling is correct
