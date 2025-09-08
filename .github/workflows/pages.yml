@@ -34,6 +34,9 @@ jobs:
         working-directory: app
         run: npm run build
 
+      - name: Include legacy app in artifact
+        run: mkdir -p app/dist/legacy && cp seasonal-random-anime/index.html app/dist/legacy/index.html
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
