@@ -49,6 +49,7 @@ jobs:
     needs: build
     outputs:
       page_url: ${{ steps.deployment.outputs.page_url }}
+      preview_url: ${{ steps.deployment.outputs.preview_url }}
     steps:
       - name: Deploy to GitHub Pages (preview)
         id: deployment
@@ -65,7 +66,8 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const body = `✅ Preview deployed: ${process.env.PAGE_URL}`;
+            const url = process.env.PREVIEW_URL || process.env.PAGE_URL;
+            const body = `✅ Preview deployed: ${url}`;
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -74,5 +76,6 @@ jobs:
             });
         env:
           PAGE_URL: ${{ needs.deploy.outputs.page_url }}
+          PREVIEW_URL: ${{ needs.deploy.outputs.preview_url }}
 
 
