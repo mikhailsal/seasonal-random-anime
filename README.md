@@ -61,12 +61,14 @@ Scripts:
 
 ## Deployment (GitHub Pages)
 - Workflow: `.github/workflows/pages.yml`
-- Deploys the static directory `seasonal-random-anime/` without a build step.
+- Builds the React app in `app/` and deploys `app/dist` to Pages.
+- Includes the legacy vanilla app at `app/dist/legacy/index.html`.
 - Trigger: push to `main` or run manually via the Actions tab.
 
-After the first successful Pages deployment, the site will be available at:
+After the first successful Pages deployment, the sites will be available at:
 ```
-https://mikhailsal.github.io/seasonal-random-anime/
+React app:  https://mikhailsal.github.io/seasonal-random-anime/
+Legacy app: https://mikhailsal.github.io/seasonal-random-anime/legacy/
 ```
 
 ## API and Rate Limits
