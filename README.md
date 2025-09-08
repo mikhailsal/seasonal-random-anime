@@ -3,7 +3,8 @@
 Single-page app that fetches seasonal anime via the public Jikan (MyAnimeList) v4 API, applies filters, and picks a random title. Initially implemented as a single static HTML file, with tests and CI set up for reliability and future refactoring.
 
 - App entry: `seasonal-random-anime/index.html`
-- Live site (after first deploy): `https://mikhailsal.github.io/seasonal-random-anime/`
+- Live site: [React app](https://mikhailsal.github.io/seasonal-random-anime/)
+- Legacy app: [Vanilla HTML version](https://mikhailsal.github.io/seasonal-random-anime/legacy/)
 
 ## Features
 - Seasonal listings with filters (type, genres, episodes, etc.)
@@ -66,10 +67,8 @@ Scripts:
 - Trigger: push to `main` or run manually via the Actions tab.
 
 After the first successful Pages deployment, the sites will be available at:
-```
-React app:  https://mikhailsal.github.io/seasonal-random-anime/
-Legacy app: https://mikhailsal.github.io/seasonal-random-anime/legacy/
-```
+- [React app](https://mikhailsal.github.io/seasonal-random-anime/)
+- [Legacy app](https://mikhailsal.github.io/seasonal-random-anime/legacy/)
 
 ## API and Rate Limits
 - Public API: Jikan v4 (https://docs.api.jikan.moe)
