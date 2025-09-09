@@ -1,7 +1,8 @@
 name: Deploy Pages (Production)
 
 on:
-  push:
+  pull_request:
+    types: [ closed ]
     branches: [ main ]
   workflow_dispatch:
 
@@ -14,10 +15,26 @@ concurrency:
 
 jobs:
   build-and-deploy:
+    if: github.event_name != 'pull_request' || github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout merged commit (merge or squash)
+        if: github.event_name == 'pull_request' && github.event.pull_request.merge_commit_sha != null
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+
+      - name: Checkout base branch tip (rebase merge)
+        if: github.event_name == 'pull_request' && github.event.pull_request.merge_commit_sha == null
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.ref }}
+
+      - name: Checkout main (manual dispatch)
+        if: github.event_name != 'pull_request'
+        uses: actions/checkout@v4
+        with:
+          ref: main
 
       - name: Setup Node
         uses: actions/setup-node@v4
