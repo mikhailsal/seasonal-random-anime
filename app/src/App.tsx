@@ -1,128 +1,128 @@
-import React from 'react';
-import { Anime, SeasonName } from './lib/types';
-import { getSeason as realGetSeason } from './services/jikan';
-import { pickRandomConsideringContinuity as realPick } from './lib/selection';
+import { useMemo, useState } from 'react';
+import type { JSX } from 'react';
 import { AnimeCard } from './components/AnimeCard';
 import { FiltersSidebar } from './components/FiltersSidebar';
+import { Header } from './components/Header';
+import { capitalize } from './lib/format';
+import { KNOWN_TYPES } from './lib/filters';
+import type { AnimeItem, SeasonName } from './lib/types';
+import { useFilters } from './hooks/useFilters';
+import { useRandomPick } from './hooks/useRandomPick';
+import { useSeasonData } from './hooks/useSeasonData';
+import { useSeasonIndex } from './hooks/useSeasonIndex';
+import { createDefaultServices, ServicesContext } from './services/context';
+import type { AppServices } from './services/context';
+import type { CheckboxOption } from './components/CheckboxGroup';
 
-export type AppDeps = {
-  services: {
-    getSeason: (year: number, season: SeasonName, opts?: { limit?: number }) => Promise<{ data: Anime[] }>;
-  };
-  selectors: {
-    pickRandomConsideringContinuity: (list: Anime[], opts?: { rng?: () => number }) => Promise<Anime | null>;
-  };
-  rng?: () => number;
-};
-
-const defaultDeps: AppDeps = {
-  services: {
-    async getSeason(year, season, opts) {
-      const limit = opts?.limit ?? 24;
-      const res = await realGetSeason(year, season, { limit });
-      return { data: res.data };
-    }
-  },
-  selectors: {
-    pickRandomConsideringContinuity: async (list, opts) => {
-      const pick = await realPick(list, { rng: opts?.rng });
-      return pick;
-    }
-  },
-  rng: Math.random
-};
-
-function currentSeasonName(d = new Date()): SeasonName {
-  const m = d.getUTCMonth() + 1;
-  if (m >= 1 && m <= 3) return 'winter';
-  if (m >= 4 && m <= 6) return 'spring';
-  if (m >= 7 && m <= 9) return 'summer';
+export function currentSeasonName(d = new Date()): SeasonName {
+  const month = d.getMonth() + 1;
+  if (month <= 3) return 'winter';
+  if (month <= 6) return 'spring';
+  if (month <= 9) return 'summer';
   return 'fall';
 }
 
-function yearsBack(from: number, back: number): number[] {
-  return Array.from({ length: back + 1 }, (_, i) => from - i);
+export function buildTypeOptions(items: readonly AnimeItem[]): CheckboxOption[] {
+  const present = new Set(items.map((i) => i.type));
+  const matched = KNOWN_TYPES.filter((t) => present.has(t));
+  const finalTypes = matched.length > 0 ? matched : KNOWN_TYPES;
+  return finalTypes.map((t) => ({ value: t, label: t }));
 }
 
-export function App(props: { deps?: Partial<AppDeps> } = {}) {
-  const deps: AppDeps = React.useMemo(() => {
-    return {
-      services: { ...defaultDeps.services, ...(props.deps?.services || {}) },
-      selectors: { ...defaultDeps.selectors, ...(props.deps?.selectors || {}) },
-      rng: props.deps?.rng ?? defaultDeps.rng
-    };
-  }, [props.deps]);
+export function buildGenreOptions(items: readonly AnimeItem[]): CheckboxOption[] {
+  const genres = new Set<string>();
+  for (const item of items) for (const g of item.genres) genres.add(g);
+  return [...genres].sort((a, b) => a.localeCompare(b)).map((g) => ({ value: g, label: g }));
+}
 
-  const now = new Date();
-  const [year, setYear] = React.useState(now.getUTCFullYear());
-  const [season, setSeason] = React.useState<SeasonName>(currentSeasonName(now));
-  const [loading, setLoading] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
-  const [items, setItems] = React.useState<Anime[]>([]);
-  const [selected, setSelected] = React.useState<Anime | null>(null);
+interface AppState {
+  year: number;
+  season: SeasonName;
+  setYear: (year: number) => void;
+  setSeason: (season: SeasonName) => void;
+  years: number[];
+  items: AnimeItem[];
+  loading: boolean;
+  error: string | null;
+  filters: ReturnType<typeof useFilters>;
+  pick: ReturnType<typeof useRandomPick>;
+}
 
-  const yearOptions = React.useMemo(() => yearsBack(now.getUTCFullYear(), 9), [now]);
+function useAppState(): AppState {
+  const [year, setYear] = useState(() => new Date().getFullYear());
+  const [season, setSeason] = useState<SeasonName>(() => currentSeasonName());
+  const index = useSeasonIndex();
+  const data = useSeasonData(year, season);
+  const filters = useFilters(data.items);
+  const sources = useMemo(
+    () => ({ items: data.items, filtered: filters.filtered, filters: filters.state }),
+    [data.items, filters.filtered, filters.state]
+  );
+  const pick = useRandomPick(sources);
+  const years = index.years.length > 0 ? index.years : [year];
+  return { year, season, setYear, setSeason, years, ...data, filters, pick };
+}
 
-  React.useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      setError(null);
-      setSelected(null);
-      try {
-        const res = await deps.services.getSeason(year, season, { limit: 24 });
-        if (!cancelled) {
-          setItems(res.data || []);
-        }
-      } catch (e: any) {
-        if (!cancelled) setError(e?.message || 'Failed to load');
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [year, season, deps.services]);
-
-  async function onRandom() {
-    if (!items.length) return;
-    const pick = await deps.selectors.pickRandomConsideringContinuity(items, { rng: deps.rng });
-    if (pick) setSelected(pick);
-  }
-
+function MainContent({ state }: { state: AppState }): JSX.Element {
+  const { pick, error } = state;
   return (
-    <main style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: 16, padding: 16, fontFamily: 'system-ui, sans-serif' }}>
-      <aside>
-        <h1 style={{ marginTop: 0 }}>Seasonal Random Anime (React)</h1>
-        <FiltersSidebar
-          year={year}
-          years={yearOptions}
-          season={season}
-          onYearChange={setYear}
-          onSeasonChange={setSeason}
-          disabled={loading}
-        />
-        <div style={{ marginTop: 12 }}>
-          <button onClick={onRandom} disabled={loading || items.length === 0} aria-label="pick-random">
-            Pick Random
-          </button>
-        </div>
-        <div style={{ marginTop: 12, color: '#666' }} aria-live="polite">
-          {loading ? 'Loading…' : error ? `Error: ${error}` : `Loaded: ${items.length}`}
-        </div>
-      </aside>
-      <section>
-        {selected ? (
-          <AnimeCard
-            title={selected.title}
-            imageUrl={selected.images?.jpg?.image_url || selected.images?.webp?.image_url || null}
-            synopsis={selected.synopsis || null}
-          />
-        ) : (
-          <p style={{ color: '#666' }}>No selection yet. Click “Pick Random”.</p>
-        )}
-      </section>
+    <main className="content">
+      {pick.picking && <div className="loading">Selecting your anime...</div>}
+      {error && <div className="notice">Failed to load season data: {error}</div>}
+      {pick.notice && <div className="notice">{pick.notice}</div>}
+      {pick.selected && !pick.picking && <AnimeCard item={pick.selected} />}
     </main>
+  );
+}
+
+function AppSidebar(props: { state: AppState; seasonLabel: string }): JSX.Element {
+  const { state, seasonLabel } = props;
+  return (
+    <FiltersSidebar
+      year={state.year}
+      years={state.years}
+      season={state.season}
+      onYearChange={state.setYear}
+      onSeasonChange={state.setSeason}
+      filters={state.filters}
+      typeOptions={buildTypeOptions(state.items)}
+      genreOptions={buildGenreOptions(state.items)}
+      loading={state.loading}
+      loadingLabel={`Loading ${seasonLabel} anime...`}
+      picking={state.pick.picking}
+      onPick={() => void state.pick.pick()}
+    />
+  );
+}
+
+function AppShell(): JSX.Element {
+  const state = useAppState();
+  const [collapsed, setCollapsed] = useState(false);
+  const seasonLabel = `${capitalize(state.season)} ${String(state.year)}`;
+  return (
+    <div className={`app-root${collapsed ? ' sidebar-collapsed' : ''}`}>
+      <Header
+        seasonLabel={seasonLabel}
+        sidebarCollapsed={collapsed}
+        onToggleSidebar={() => {
+          setCollapsed((c) => !c);
+        }}
+      />
+      <div className="container">
+        <div className="app-layout">
+          <AppSidebar state={state} seasonLabel={seasonLabel} />
+          <MainContent state={state} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function App({ services }: { services?: AppServices } = {}): JSX.Element {
+  const value = useMemo(() => services ?? createDefaultServices(), [services]);
+  return (
+    <ServicesContext.Provider value={value}>
+      <AppShell />
+    </ServicesContext.Provider>
   );
 }

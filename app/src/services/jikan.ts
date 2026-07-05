@@ -1,51 +1,75 @@
-import { fetchWithRetry, FetchWithRetryOptions } from '../lib/net';
-import type { SeasonIndexResponse, SeasonAnimePageResponse } from '../lib/types';
+import { fetchWithRetry } from '../lib/net';
+import type { FetchWithRetryOptions } from '../lib/net';
+import type {
+  Anime,
+  PicturesResponse,
+  RelationsResponse,
+  SeasonAnimePageResponse,
+  SeasonIndexResponse,
+  SeasonName
+} from '../lib/types';
 
 export const JIKAN_BASE = 'https://api.jikan.moe/v4';
 
-export type JikanOptions = {
-  fetchImpl?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
-  retries?: number;
-  baseDelayMs?: number;
-  timeoutMs?: number;
-  // expose onRetry for tests/observability
-  onRetry?: (attempt: number, errOrStatus: number | Error) => void;
-};
+export type JikanOptions = Pick<
+  FetchWithRetryOptions,
+  'fetchImpl' | 'retries' | 'baseDelayMs' | 'timeoutMs' | 'onRetry'
+>;
 
-export async function getSeasons(options?: JikanOptions): Promise<SeasonIndexResponse> {
-  const { fetchImpl, retries, baseDelayMs, timeoutMs, onRetry } = options || {};
-  const res = await fetchWithRetry(`${JIKAN_BASE}/seasons`, {
-    fetchImpl,
-    retries,
-    baseDelayMs,
-    timeoutMs,
-    onRetry,
-  } as FetchWithRetryOptions);
-  return res.json() as Promise<SeasonIndexResponse>;
+async function getJson<T>(url: string, options: JikanOptions = {}): Promise<T> {
+  const res = await fetchWithRetry(url, options);
+  return res.json() as Promise<T>;
 }
 
-export async function getSeason(
+export function getSeasonsIndex(options?: JikanOptions): Promise<SeasonIndexResponse> {
+  return getJson<SeasonIndexResponse>(`${JIKAN_BASE}/seasons`, options);
+}
+
+export function getSeasonPage(
   year: number,
-  season: 'winter' | 'spring' | 'summer' | 'fall',
-  params?: { limit?: number } & JikanOptions
+  season: SeasonName,
+  params: { page?: number; limit?: number } & JikanOptions = {}
 ): Promise<SeasonAnimePageResponse> {
-  const { limit } = params || {};
-  const { fetchImpl, retries, baseDelayMs, timeoutMs, onRetry } = params || {};
-  const qs = typeof limit === 'number' ? `?limit=${encodeURIComponent(String(limit))}` : '';
-  const url = `${JIKAN_BASE}/seasons/${year}/${season}${qs}`;
+  const { page = 1, limit = 25, ...options } = params;
+  const url = `${JIKAN_BASE}/seasons/${String(year)}/${season}?page=${String(page)}&limit=${String(limit)}`;
+  return getJson<SeasonAnimePageResponse>(url, options);
+}
 
-  const res = await fetchWithRetry(url, {
-    fetchImpl,
-    retries,
-    baseDelayMs,
-    timeoutMs,
-    onRetry,
-  } as FetchWithRetryOptions);
+export function getRelations(malId: number, options?: JikanOptions): Promise<RelationsResponse> {
+  return getJson<RelationsResponse>(`${JIKAN_BASE}/anime/${String(malId)}/relations`, options);
+}
 
-  if (!res.ok) {
-    throw new Error(`HTTP ${res.status}`);
+export function getPictures(malId: number, options?: JikanOptions): Promise<PicturesResponse> {
+  return getJson<PicturesResponse>(`${JIKAN_BASE}/anime/${String(malId)}/pictures`, options);
+}
+
+export interface LoadSeasonOptions extends JikanOptions {
+  maxPages?: number;
+  pageDelayMs?: number;
+  sleep?: (ms: number) => Promise<void>;
+}
+
+const defaultSleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Progressively load a season: paginate up to `maxPages` pages of 25 items
+ * with a gentle delay between pages (legacy parity: 5 pages, 350ms).
+ */
+export async function loadFullSeason(
+  year: number,
+  season: SeasonName,
+  options: LoadSeasonOptions = {}
+): Promise<Anime[]> {
+  const { maxPages = 5, pageDelayMs = 350, sleep = defaultSleep, ...jikan } = options;
+  const aggregated: Anime[] = [];
+  let page = 1;
+  let hasNext = true;
+  while (hasNext && page <= maxPages) {
+    const resp = await getSeasonPage(year, season, { page, limit: 25, ...jikan });
+    aggregated.push(...resp.data);
+    hasNext = resp.pagination?.has_next_page === true;
+    page += 1;
+    if (hasNext && page <= maxPages) await sleep(pageDelayMs);
   }
-
-  const data = await res.json();
-  return data as SeasonAnimePageResponse;
+  return aggregated;
 }
