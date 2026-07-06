@@ -15,7 +15,7 @@ on:
 
 jobs:
   test:
-    name: Unit tests
+    name: Legacy unit tests
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -29,6 +29,38 @@ jobs:
         run: npm ci
       - name: Run unit tests
         run: npm run test:unit
+
+  app:
+    name: React app quality gate
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - name: Install
+        run: npm ci
+      - name: Lint (ESLint, max-lines 400 / max-lines-per-function 25)
+        run: npm run lint
+      - name: Format check
+        run: npm run format
+      - name: Typecheck (strict)
+        run: npm run typecheck
+      - name: Unit + functional tests with coverage gate (>=80%)
+        run: npm run test:coverage
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+      # No separate build step: Playwright's webServer runs a production
+      # build and serves it, so e2e validates the build too.
+      - name: E2E tests (Playwright, mocked Jikan API, production build)
+        run: npm run test:e2e
 
   integration:
     name: Integration tests

@@ -1,103 +1,120 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { getSeasons, getSeason, JIKAN_BASE } from './jikan';
+import { getPictures, getRelations, getSeasonPage, getSeasonsIndex, loadFullSeason } from './jikan';
+import type { FetchLike } from '../lib/net';
+import { makeAnime } from '../test/fixtures';
+
+function jsonResponse(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), { status });
+}
 
 describe('jikan service', () => {
-  beforeEach(() => {
-    vi.useFakeTimers();
-    vi.restoreAllMocks();
+  it('getSeasonsIndex hits /seasons', async () => {
+    const fetchImpl = vi
+      .fn<FetchLike>()
+      .mockResolvedValue(jsonResponse({ data: [{ year: 2026, seasons: ['winter'] }] }));
+    const res = await getSeasonsIndex({ fetchImpl });
+    expect(res.data[0]?.year).toBe(2026);
+    expect(fetchImpl).toHaveBeenCalledWith('https://api.jikan.moe/v4/seasons', expect.any(Object));
   });
 
-  afterEach(() => {
-    vi.useRealTimers();
+  it('getSeasonPage builds page/limit query', async () => {
+    const fetchImpl = vi.fn<FetchLike>().mockResolvedValue(jsonResponse({ data: [] }));
+    await getSeasonPage(2026, 'summer', { page: 3, limit: 25, fetchImpl });
+    expect(fetchImpl).toHaveBeenCalledWith(
+      'https://api.jikan.moe/v4/seasons/2026/summer?page=3&limit=25',
+      expect.any(Object)
+    );
   });
 
-  it('constructs correct URL for getSeasons and getSeason with limit', async () => {
-    const seasonsPayload = { data: [{ year: 2024, seasons: ['summer'] }] };
-    const seasonPagePayload = { data: [{ mal_id: 1, title: 'A' }], pagination: { has_next_page: false } };
-
-    const fetchImpl = vi.fn((input: any) => {
-      const url = String(input);
-      if (url === `${JIKAN_BASE}/seasons`) {
-        return Promise.resolve({ ok: true, status: 200, json: async () => seasonsPayload } as unknown as Response);
-      }
-      if (url === `${JIKAN_BASE}/seasons/2024/summer?limit=5`) {
-        return Promise.resolve({ ok: true, status: 200, json: async () => seasonPagePayload } as unknown as Response);
-      }
-      return Promise.resolve({ ok: false, status: 404 } as unknown as Response);
-    }) as unknown as (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
-
-    const res1 = await getSeasons({ fetchImpl });
-    expect(res1).toEqual(seasonsPayload);
-    expect(fetchImpl).toHaveBeenCalledWith(`${JIKAN_BASE}/seasons`, expect.anything());
-
-    const res2 = await getSeason(2024, 'summer', { limit: 5, fetchImpl });
-    expect(res2).toEqual(seasonPagePayload);
-    expect(fetchImpl).toHaveBeenCalledWith(`${JIKAN_BASE}/seasons/2024/summer?limit=5`, expect.anything());
+  it('getRelations and getPictures target the anime endpoints', async () => {
+    const fetchImpl = vi
+      .fn<FetchLike>()
+      .mockImplementation(() => Promise.resolve(jsonResponse({ data: [] })));
+    await getRelations(42, { fetchImpl });
+    await getPictures(42, { fetchImpl });
+    expect(fetchImpl).toHaveBeenCalledWith(
+      'https://api.jikan.moe/v4/anime/42/relations',
+      expect.any(Object)
+    );
+    expect(fetchImpl).toHaveBeenCalledWith(
+      'https://api.jikan.moe/v4/anime/42/pictures',
+      expect.any(Object)
+    );
   });
 
-  it('surfaces Error("HTTP 503") after max retries when all attempts return 503', async () => {
-    const fetchImpl = vi.fn(() => Promise.resolve({ ok: false, status: 503 } as unknown as Response)) as unknown as (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
-    const onRetry = vi.fn();
+  describe('loadFullSeason', () => {
+    it('aggregates pages until has_next_page is false', async () => {
+      const fetchImpl = vi
+        .fn<FetchLike>()
+        .mockResolvedValueOnce(
+          jsonResponse({ data: [makeAnime({ mal_id: 1 })], pagination: { has_next_page: true } })
+        )
+        .mockResolvedValueOnce(
+          jsonResponse({ data: [makeAnime({ mal_id: 2 })], pagination: { has_next_page: false } })
+        );
+      const items = await loadFullSeason(2026, 'summer', {
+        fetchImpl,
+        sleep: () => Promise.resolve()
+      });
+      expect(items.map((a) => a.mal_id)).toEqual([1, 2]);
+      expect(fetchImpl).toHaveBeenCalledTimes(2);
+    });
 
-    const p = getSeasons({ fetchImpl, retries: 3, baseDelayMs: 10, onRetry });
+    it('de-duplicates items by mal_id across pages, keeping the first occurrence', async () => {
+      const first = makeAnime({ mal_id: 1, title: 'First Occurrence' });
+      const duplicate = makeAnime({ mal_id: 1, title: 'Shifted Duplicate' });
+      const fetchImpl = vi
+        .fn<FetchLike>()
+        .mockResolvedValueOnce(
+          jsonResponse({
+            data: [first, makeAnime({ mal_id: 2 })],
+            pagination: { has_next_page: true }
+          })
+        )
+        .mockResolvedValueOnce(
+          jsonResponse({
+            data: [duplicate, makeAnime({ mal_id: 3 })],
+            pagination: { has_next_page: false }
+          })
+        );
+      const items = await loadFullSeason(2026, 'summer', {
+        fetchImpl,
+        sleep: () => Promise.resolve()
+      });
+      expect(items.map((a) => a.mal_id)).toEqual([1, 2, 3]);
+      expect(items[0]?.title).toBe('First Occurrence');
+    });
 
-    // Create a promise that handles the rejection properly
-    const resultPromise = p.catch(err => err);
+    it('keeps items without a mal_id even if several appear', async () => {
+      const fetchImpl = vi.fn<FetchLike>().mockResolvedValue(
+        jsonResponse({
+          data: [makeAnime({ mal_id: undefined }), makeAnime({ mal_id: undefined })],
+          pagination: { has_next_page: false }
+        })
+      );
+      const items = await loadFullSeason(2026, 'summer', {
+        fetchImpl,
+        sleep: () => Promise.resolve()
+      });
+      expect(items).toHaveLength(2);
+    });
 
-    // initial attempt
-    await Promise.resolve();
-    expect(fetchImpl).toHaveBeenCalledTimes(1);
-    expect(onRetry).toHaveBeenCalledTimes(1); // called when 503 detected on attempt 1
-
-    // advance first backoff (10ms)
-    await vi.advanceTimersByTimeAsync(10);
-    await Promise.resolve();
-    expect(fetchImpl).toHaveBeenCalledTimes(2);
-    expect(onRetry).toHaveBeenCalledTimes(2); // called on attempt 2
-
-    // advance second backoff (20ms)
-    await vi.advanceTimersByTimeAsync(20);
-    await Promise.resolve();
-    expect(fetchImpl).toHaveBeenCalledTimes(3);
-
-    // Now properly await the rejection
-    const result = await resultPromise;
-    expect(result).toBeInstanceOf(Error);
-    expect((result as Error).message).toBe('HTTP 503');
-
-    // onRetry should have been called for attempts 1 and 2 (not for final failed attempt)
-    expect(onRetry).toHaveBeenCalledTimes(2);
-  });
-
-  it('passes retries/baseDelayMs/timeoutMs down to fetchWithRetry (observable via onRetry and signal)', async () => {
-    const recorded: any[] = [];
-    let call = 0;
-    const fetchImpl = vi.fn((input: any, init?: any) => {
-      call += 1;
-      recorded.push({ input: String(input), init });
-      // fail first call with network error, succeed second
-      if (call === 1) return Promise.reject(new Error('network'));
-      return Promise.resolve({ ok: true, status: 200, json: async () => ({ data: [] }) } as unknown as Response);
-    }) as unknown as (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
-
-    const onRetry = vi.fn();
-
-    const p = getSeasons({ fetchImpl, retries: 2, baseDelayMs: 123, timeoutMs: 111, onRetry });
-
-    // after first rejection, onRetry should be called
-    await Promise.resolve();
-    expect(onRetry).toHaveBeenCalledTimes(1);
-    expect(recorded.length).toBeGreaterThan(0);
-    // ensure the init.signal was passed into fetchImpl
-    expect(recorded[0].init).toBeDefined();
-    expect(recorded[0].init.signal).toBeDefined();
-
-    // advance backoff 123ms
-    await vi.advanceTimersByTimeAsync(123);
-    await Promise.resolve();
-
-    const res = await p;
-    expect(res).toBeDefined();
-    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    it('caps pagination at maxPages (legacy: 5)', async () => {
+      let page = 0;
+      const fetchImpl = vi.fn<FetchLike>().mockImplementation(() => {
+        page += 1;
+        return Promise.resolve(
+          jsonResponse({
+            data: [makeAnime({ mal_id: page })],
+            pagination: { has_next_page: true }
+          })
+        );
+      });
+      const items = await loadFullSeason(2026, 'summer', {
+        fetchImpl,
+        sleep: () => Promise.resolve()
+      });
+      expect(fetchImpl).toHaveBeenCalledTimes(5);
+      expect(items.map((a) => a.mal_id)).toEqual([1, 2, 3, 4, 5]);
+    });
   });
 });

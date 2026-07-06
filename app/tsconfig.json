@@ -1,17 +1,23 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["ES2023", "DOM"],
-    "module": "ES2022",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
     "moduleResolution": "Bundler",
     "skipLibCheck": true,
     "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "forceConsistentCasingInFileNames": true,
     "jsx": "react-jsx",
     "noEmit": true,
     "allowJs": false,
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "types": ["vitest/globals", "@testing-library/jest-dom"]
+    "useDefineForClassFields": true,
+    "types": ["vitest/globals", "@testing-library/jest-dom", "vite/client"]
   },
   "include": ["src", "vite.config.ts", "vitest.config.ts"]
 }

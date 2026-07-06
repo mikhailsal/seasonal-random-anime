@@ -1,13 +1,15 @@
+import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import React from 'react';
 import { App } from './App';
+import './styles/base.css';
+import './styles/card.css';
 
 const el = document.getElementById('root');
 if (!el) {
   throw new Error('#root not found');
 }
 createRoot(el).render(
-  <React.StrictMode>
+  <StrictMode>
     <App />
-  </React.StrictMode>
+  </StrictMode>
 );

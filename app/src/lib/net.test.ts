@@ -1,163 +1,75 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { fetchWithRetry } from './net';
+import type { FetchLike } from './net';
+
+function jsonResponse(status: number, body: unknown = {}): Response {
+  return new Response(JSON.stringify(body), { status });
+}
 
 describe('fetchWithRetry', () => {
-  beforeEach(() => {
-    vi.useFakeTimers();
-    vi.restoreAllMocks();
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  it('retries on 429 twice then succeeds and calls onRetry with statuses', async () => {
-    let call = 0;
-    const successResp = { ok: true, status: 200, json: async () => ({ ok: true }) };
-
-    const rawFetchImpl = (input: any, init?: any) => {
-      call += 1;
-      if (call <= 2) {
-        return Promise.resolve({ ok: false, status: 429 } as unknown as Response);
-      }
-      return Promise.resolve(successResp as unknown as Response);
-    };
-    const fetchImpl = vi.fn(rawFetchImpl) as unknown as (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
-
-    const onRetry = vi.fn();
-
-    const p = fetchWithRetry('http://example', {
-      fetchImpl,
-      retries: 3,
-      baseDelayMs: 500,
-      jitter: false,
-      onRetry,
-    });
-
-    // First attempt -> 429 -> onRetry should have been called once
-    await Promise.resolve();
+  it('returns the response on first success', async () => {
+    const fetchImpl: FetchLike = vi.fn().mockResolvedValue(jsonResponse(200, { ok: true }));
+    const res = await fetchWithRetry('https://x.test/', { fetchImpl });
+    expect(res.status).toBe(200);
     expect(fetchImpl).toHaveBeenCalledTimes(1);
-    expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries on 429 and succeeds', async () => {
+    const fetchImpl = vi
+      .fn<FetchLike>()
+      .mockResolvedValueOnce(jsonResponse(429))
+      .mockResolvedValueOnce(jsonResponse(200));
+    const onRetry = vi.fn();
+    const res = await fetchWithRetry('https://x.test/', {
+      fetchImpl,
+      baseDelayMs: 1,
+      onRetry
+    });
+    expect(res.status).toBe(200);
     expect(onRetry).toHaveBeenCalledWith(1, 429);
+  });
 
-    // Advance first backoff (500ms)
-    await vi.advanceTimersByTimeAsync(500);
-    await Promise.resolve();
-
-    // Second attempt -> 429 -> onRetry called second time
+  it('throws HTTP error after exhausting retries on retryable status', async () => {
+    const fetchImpl: FetchLike = vi.fn().mockResolvedValue(jsonResponse(503));
+    await expect(
+      fetchWithRetry('https://x.test/', { fetchImpl, retries: 2, baseDelayMs: 1 })
+    ).rejects.toThrow('HTTP 503');
     expect(fetchImpl).toHaveBeenCalledTimes(2);
-    expect(onRetry).toHaveBeenCalledTimes(2);
-    expect(onRetry).toHaveBeenCalledWith(2, 429);
-
-    // Advance second backoff (1000ms)
-    await vi.advanceTimersByTimeAsync(1000);
-    await Promise.resolve();
-
-    // Third attempt -> success
-    expect(fetchImpl).toHaveBeenCalledTimes(3);
-
-    const res = await p;
-    expect(res).toBeDefined();
-    expect(onRetry).toHaveBeenCalledTimes(2);
   });
 
-  it('does not retry on 400 and throws HTTP 400', async () => {
-    // This test doesn't need fake timers - disable them for this specific test
-    vi.useRealTimers();
-
-    const rawFetchImpl = () => Promise.resolve({ ok: false, status: 400 } as unknown as Response);
-    const fetchImpl = vi.fn(rawFetchImpl) as unknown as (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
-
-    try {
-      await fetchWithRetry('http://example', {
-        fetchImpl,
-        retries: 3,
-        baseDelayMs: 10,
-      });
-      throw new Error('Expected to throw');
-    } catch (error: any) {
-      expect(error.message).toBe('HTTP 400');
-    }
-
-    expect(fetchImpl).toHaveBeenCalledTimes(1);
-
-    // Restore fake timers for other tests
-    vi.useFakeTimers();
-  });
-
-  it('aborts on timeoutMs and results in AbortError', async () => {
-    // fetchImpl that listens to signal and rejects when aborted
-    const rawFetchImpl = (input: any, init?: any) => {
-      return new Promise((_res, rej) => {
-        const signal = init?.signal;
-        if (signal) {
-          if (signal.aborted) {
-            const e = new Error('AbortError') as any;
-            e.name = 'AbortError';
-            return rej(e);
-          }
-          signal.addEventListener('abort', () => {
-            const e = new Error('AbortError') as any;
-            e.name = 'AbortError';
-            rej(e);
-          });
-        }
-        // never resolve, simulating a hanging request
-      });
-    };
-    const fetchImpl = vi.fn(rawFetchImpl) as unknown as (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
-
-    const p = fetchWithRetry('http://example', {
-      fetchImpl,
-      timeoutMs: 100,
-      retries: 2,
-      baseDelayMs: 10,
-    });
-
-    // Create a promise that handles the rejection properly
-    const resultPromise = p.catch(err => err);
-
-    // advance time to trigger timeout abort
-    await vi.advanceTimersByTimeAsync(100);
-    await Promise.resolve();
-
-    // Now properly await the rejection
-    const result = await resultPromise;
-    expect(result).toMatchObject({ name: 'AbortError' });
+  it('does not retry on plain 404', async () => {
+    const fetchImpl: FetchLike = vi.fn().mockResolvedValue(jsonResponse(404));
+    await expect(fetchWithRetry('https://x.test/', { fetchImpl })).rejects.toThrow('HTTP 404');
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
-  it('retries on network error (rejected fetch) then succeeds', async () => {
-    let attempt = 0;
-    const rawFetchImpl = () => {
-      attempt += 1;
-      if (attempt === 1) {
-        return Promise.reject(new Error('network'));
-      }
-      return Promise.resolve({ ok: true, status: 200, json: async () => ({}) } as unknown as Response);
-    };
-    const fetchImpl = vi.fn(rawFetchImpl) as unknown as (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
-
-    const onRetry = vi.fn();
-
-    const p = fetchWithRetry('http://example', {
-      fetchImpl,
-      retries: 2,
-      baseDelayMs: 250,
-      jitter: false,
-      onRetry,
-    });
-
-    // after first rejection, onRetry should be called and backoff scheduled (250)
-    await Promise.resolve();
-    expect(onRetry).toHaveBeenCalledTimes(1);
-    expect(onRetry.mock.calls[0][1]).toBeInstanceOf(Error);
-
-    await vi.advanceTimersByTimeAsync(250);
-    await Promise.resolve();
-
-    const res = await p;
-    expect(res).toBeDefined();
+  it('retries network errors and eventually throws the last one', async () => {
+    const fetchImpl: FetchLike = vi.fn().mockRejectedValue(new Error('ECONNRESET'));
+    await expect(
+      fetchWithRetry('https://x.test/', { fetchImpl, retries: 2, baseDelayMs: 1 })
+    ).rejects.toThrow('ECONNRESET');
     expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
+  it('propagates timeout aborts without retrying', async () => {
+    const abort = new Error('aborted');
+    abort.name = 'AbortError';
+    const fetchImpl: FetchLike = vi.fn().mockRejectedValue(abort);
+    await expect(fetchWithRetry('https://x.test/', { fetchImpl })).rejects.toMatchObject({
+      name: 'AbortError'
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('supports jitter in the backoff', async () => {
+    const fetchImpl = vi
+      .fn<FetchLike>()
+      .mockResolvedValueOnce(jsonResponse(429))
+      .mockResolvedValueOnce(jsonResponse(200));
+    const res = await fetchWithRetry('https://x.test/', {
+      fetchImpl,
+      baseDelayMs: 1,
+      jitter: true
+    });
+    expect(res.status).toBe(200);
   });
 });

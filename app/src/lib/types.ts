@@ -1,70 +1,95 @@
-export type JikanRelationEntry = { mal_id: number; title: string; };
-
-export interface RelationEdge { relation: string; entry: JikanRelationEntry[]; }
-
-export interface AnimeAPIPayload {
-  mal_id?: number;
-  url?: string;
-  title?: string;
-  title_english?: string;
-  title_japanese?: string;
-  type?: string;
-  episodes?: number;
-  duration?: string;
-  score?: number;
-  scored_by?: number;
-  rank?: number;
-  popularity?: number;
-  synopsis?: string;
-  images?: {
-    webp?: { large_image_url?: string; image_url?: string };
-    jpg?: { large_image_url?: string; image_url?: string };
-  };
-  [key: string]: any;
-}
-
-export interface AnimeItem {
-  title: string;
-  rating?: number;
-  popularity?: string;
-  episodes?: number;
-  type?: string;
-  genres: string[];
-  description?: string;
-  images?: string[] | null;
-  currentImageIndex?: number;
-  link?: string;
-  apiData?: AnimeAPIPayload;
-}
-
-export interface DependencyFetch {
-  fetchRelations?: (malId: number) => Promise<{ data: { relation: string; entry: { mal_id: number; title: string }[] }[] }>;
-  fetchImages?: (malId: number) => Promise<string[]>;
-}
-
-export type RNG = () => number;
-
-/**
- * Jikan / app-specific response types
- */
-
 export type SeasonName = 'winter' | 'spring' | 'summer' | 'fall';
 
-export interface SeasonIndexResponse {
-  data: Array<{
-    year: number;
-    seasons: SeasonName[];
-  }>;
+export const SEASON_NAMES: readonly SeasonName[] = ['winter', 'spring', 'summer', 'fall'];
+
+export interface NamedEntity {
+  mal_id?: number;
+  name: string;
 }
 
-/**
- * Minimal Anime type used by the service layer.
- * We reuse the API payload shape as a base so callers can
- * access raw fields when needed.
- */
-export interface Anime extends AnimeAPIPayload {
-  mal_id?: number;
-  title?: string;
+export interface ImageVariant {
+  image_url?: string;
+  small_image_url?: string;
+  large_image_url?: string;
+}
+
+export interface ImageSet {
+  jpg?: ImageVariant | undefined;
+  webp?: ImageVariant | undefined;
+}
+
+export interface AiredRange {
+  from?: string | null;
+  to?: string | null;
+}
+
+export interface Broadcast {
+  string?: string | null;
+}
+
+export interface Trailer {
+  url?: string | null;
+}
+
+/** Raw anime payload from the Jikan v4 API. Fields may be absent or explicitly undefined. */
+export interface Anime {
+  mal_id?: number | undefined;
+  url?: string | undefined;
+  title?: string | undefined;
+  title_english?: string | null;
+  title_japanese?: string | null;
+  type?: string | null;
+  source?: string | null;
+  episodes?: number | null;
+  status?: string | null;
+  aired?: AiredRange | null;
+  duration?: string | null;
+  rating?: string | null;
+  score?: number | null;
+  scored_by?: number | null;
+  rank?: number | null;
+  popularity?: number | null;
+  members?: number | null;
+  favorites?: number | null;
+  synopsis?: string | null;
+  background?: string | null;
+  season?: string | null;
+  year?: number | null;
+  broadcast?: Broadcast | null;
+  producers?: NamedEntity[] | undefined;
+  licensors?: NamedEntity[] | undefined;
+  studios?: NamedEntity[] | undefined;
+  genres?: NamedEntity[] | undefined;
+  explicit_genres?: NamedEntity[] | undefined;
+  themes?: NamedEntity[] | undefined;
+  demographics?: NamedEntity[] | undefined;
+  trailer?: Trailer | null | undefined;
+  images?: ImageSet | undefined;
+}
+
+/** App view model built from a raw Anime payload (mirrors the legacy SPA item shape). */
+export interface AnimeItem {
+  title: string;
+  rating: number | 'N/A';
+  popularity: string;
+  episodes: number | 'N/A';
+  type: string;
+  genres: string[];
+  description: string;
+  images: string[] | null;
+  currentImageIndex: number;
+  link: string;
+  galleryAugmented: boolean;
+  apiData: Anime;
+}
+
+export interface SeasonIndexEntry {
+  year: number;
+  seasons: SeasonName[];
+}
+
+export interface SeasonIndexResponse {
+  data: SeasonIndexEntry[];
 }
 
 export interface SeasonAnimePageResponse {
@@ -73,3 +98,29 @@ export interface SeasonAnimePageResponse {
     has_next_page?: boolean;
   };
 }
+
+export interface RelationEntry {
+  mal_id: number;
+  title: string;
+}
+
+export interface RelationEdge {
+  relation: string;
+  entry: RelationEntry[];
+}
+
+export interface RelationsResponse {
+  data: RelationEdge[];
+}
+
+export interface PictureEntry {
+  images?: ImageSet;
+  jpg?: ImageVariant;
+  webp?: ImageVariant;
+}
+
+export interface PicturesResponse {
+  data: PictureEntry[];
+}
+
+export type RNG = () => number;

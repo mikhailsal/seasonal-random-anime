@@ -1,49 +1,57 @@
-export interface SelectionDeps {
-  fetchRelations?: (malId: number) => Promise<{ data: { relation: string; entry: { mal_id: number; title: string }[] }[] }>;
+import type { AnimeItem, RNG } from './types';
+
+export type ContinuationChecker = (malId: number) => Promise<boolean>;
+
+export interface SelectionOptions {
+  rng?: RNG;
+  includeContinuations?: boolean;
+  isContinuation?: ContinuationChecker;
+  /** Delay between retry attempts (legacy: 150ms). Injectable for tests. */
+  delayMs?: number;
+  sleep?: (ms: number) => Promise<void>;
 }
 
-export type RNG = () => number;
+/** Legacy parity: cap the continuation-avoidance retries at 20 attempts. */
+export const MAX_CONTINUITY_ATTEMPTS = 20;
+
+const defaultSleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+
+function randomOf<T>(source: readonly T[], rng: RNG): T {
+  const index = Math.floor(rng() * source.length);
+  return source[index] as T;
+}
+
+async function checkContinuation(
+  item: AnimeItem,
+  isContinuation: ContinuationChecker | undefined
+): Promise<boolean> {
+  const malId = item.apiData.mal_id;
+  if (!isContinuation || malId == null) return false;
+  try {
+    return await isContinuation(malId);
+  } catch {
+    return false;
+  }
+}
 
 /**
- * Pick a random item from the source, with an optional dependency-based check to avoid continuations.
- * - If includeContinuations is true, returns any random element from the source (no network access).
- * - Otherwise, attempts to detect continuations via provided deps.fetchRelations and retries a few times.
- * - The function is pure w.r.t DOM; it does not render anything.
+ * Pick a random anime; unless continuations are included, retry (up to 20
+ * attempts, legacy parity) to avoid titles that have a prequel.
  */
-export async function pickRandomConsideringContinuity<T extends { apiData?: any }>(
-  source: T[],
-  options?: { deps?: SelectionDeps; rng?: RNG; includeContinuations?: boolean }
-): Promise<T> {
-  const { deps, rng = Math.random, includeContinuations = false } = options ?? {};
+export async function pickRandomConsideringContinuity(
+  source: readonly AnimeItem[],
+  options: SelectionOptions = {}
+): Promise<AnimeItem | null> {
+  const { rng = Math.random, includeContinuations = false, isContinuation } = options;
+  const { delayMs = 150, sleep = defaultSleep } = options;
+  if (source.length === 0) return null;
+  if (includeContinuations) return randomOf(source, rng);
 
-  if (!source || source.length === 0) return null as any;
-
-  if (includeContinuations) {
-    return source[Math.floor(rng() * source.length)];
-  }
-
-  const maxAttempts = Math.min(20, Math.max(20, source.length * 2));
-  for (let i = 0; i < maxAttempts; i++) {
-    const candidate = source[Math.floor(rng() * source.length)];
-    const malId = (candidate as any)?.apiData?.mal_id ?? (candidate as any)?.mal_id;
-    let isCont = false;
-
-    if (deps?.fetchRelations && malId != null) {
-      try {
-        const relResp = await deps.fetchRelations(malId);
-        const hasPrequel = Array.isArray(relResp?.data)
-          && relResp.data.some(rel => typeof rel?.relation === 'string' && rel.relation.toLowerCase() === 'prequel');
-        isCont = hasPrequel;
-      } catch {
-        isCont = false;
-      }
-    }
-
+  for (let attempt = 0; attempt < MAX_CONTINUITY_ATTEMPTS; attempt++) {
+    const candidate = randomOf(source, rng);
+    const isCont = await checkContinuation(candidate, isContinuation);
     if (!isCont) return candidate;
-    await new Promise(r => setTimeout(r, 150));
+    await sleep(delayMs);
   }
-
-  return source[Math.floor(rng() * source.length)];
+  return randomOf(source, rng);
 }
-
-export default pickRandomConsideringContinuity;
