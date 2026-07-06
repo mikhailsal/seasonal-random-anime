@@ -35,12 +35,27 @@ describe('continuity', () => {
       expect(fetchImpl).toHaveBeenCalledTimes(1);
     });
 
-    it('treats network failures as non-continuation and caches that too', async () => {
+    it('treats network failures as non-continuation without caching them', async () => {
       const fetchImpl = vi.fn<FetchLike>().mockRejectedValue(new Error('down'));
       const check = createContinuationChecker({ fetchImpl, retries: 1, baseDelayMs: 1 });
       await expect(check(11)).resolves.toBe(false);
+      // The failure is not cached, so the next call re-checks the endpoint.
       await expect(check(11)).resolves.toBe(false);
-      expect(fetchImpl).toHaveBeenCalledTimes(1);
+      expect(fetchImpl).toHaveBeenCalledTimes(2);
+    });
+
+    it('recovers after a transient failure and then caches the success', async () => {
+      const fetchImpl = vi
+        .fn<FetchLike>()
+        .mockRejectedValueOnce(new Error('down'))
+        .mockResolvedValue(
+          jsonResponse({ data: [{ relation: 'Prequel', entry: [{ mal_id: 1, title: 'S1' }] }] })
+        );
+      const check = createContinuationChecker({ fetchImpl, retries: 1, baseDelayMs: 1 });
+      await expect(check(12)).resolves.toBe(false);
+      await expect(check(12)).resolves.toBe(true);
+      await expect(check(12)).resolves.toBe(true);
+      expect(fetchImpl).toHaveBeenCalledTimes(2);
     });
   });
 });

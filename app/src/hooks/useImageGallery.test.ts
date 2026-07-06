@@ -78,6 +78,27 @@ describe('useImageGallery', () => {
     expect(preload).not.toHaveBeenCalled();
   });
 
+  it('drops a stale preload that resolves after the gallery changed', async () => {
+    const { preload, resolve } = manualPreloader();
+    const { result, rerender } = renderHook(({ images }) => useImageGallery(images, preload), {
+      initialProps: { images: TWO_IMAGES }
+    });
+    act(() => {
+      result.current.cycle();
+    });
+    expect(result.current.loading).toBe(true);
+    const next = ['https://cdn.test/x.jpg', 'https://cdn.test/y.jpg', 'https://cdn.test/z.jpg'];
+    rerender({ images: next });
+    expect(result.current.index).toBe(0);
+    act(resolve);
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+    // The advance computed against the old gallery must not apply to the new one.
+    expect(result.current.index).toBe(0);
+    expect(result.current.count).toBe(3);
+  });
+
   it('resets the index when the image list changes', async () => {
     const preload: ImagePreloader = () => Promise.resolve();
     const { result, rerender } = renderHook(({ images }) => useImageGallery(images, preload), {

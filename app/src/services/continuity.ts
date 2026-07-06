@@ -12,19 +12,19 @@ export function hasPrequel(relations: RelationsResponse): boolean {
 /**
  * Create a memoized continuation checker backed by the Jikan relations
  * endpoint (legacy parity: cache by MAL id, treat errors as "not a continuation").
+ * Only successful lookups are cached so transient failures get re-checked.
  */
 export function createContinuationChecker(options: JikanOptions = {}): ContinuationChecker {
   const cache = new Map<number, boolean>();
   return async (malId: number): Promise<boolean> => {
     const cached = cache.get(malId);
     if (cached !== undefined) return cached;
-    let isCont: boolean;
     try {
-      isCont = hasPrequel(await getRelations(malId, options));
+      const isCont = hasPrequel(await getRelations(malId, options));
+      cache.set(malId, isCont);
+      return isCont;
     } catch {
-      isCont = false;
+      return false;
     }
-    cache.set(malId, isCont);
-    return isCont;
   };
 }

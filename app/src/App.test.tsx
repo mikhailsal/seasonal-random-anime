@@ -47,16 +47,27 @@ describe('helpers', () => {
     expect(currentSeasonName(new Date(2026, 10, 15))).toBe('fall');
   });
 
-  it('buildTypeOptions keeps known present types and falls back to all', () => {
-    const items = [makeItem({ type: 'TV' }), makeItem({ type: 'Movie' })];
+  it('buildTypeOptions keeps known present types in stable order', () => {
+    const items = [makeItem({ type: 'Movie' }), makeItem({ type: 'TV' })];
     expect(buildTypeOptions(items).map((o) => o.value)).toEqual(['TV', 'Movie']);
-    expect(buildTypeOptions([makeItem({ type: 'Weird' })]).map((o) => o.value)).toEqual([
+  });
+
+  it('buildTypeOptions includes newer Jikan types and appends unknown ones', () => {
+    const items = [makeItem({ type: 'TV Special' }), makeItem({ type: 'Weird' })];
+    expect(buildTypeOptions(items).map((o) => o.value)).toEqual(['TV Special', 'Weird']);
+  });
+
+  it('buildTypeOptions falls back to all known types for an empty list', () => {
+    expect(buildTypeOptions([]).map((o) => o.value)).toEqual([
       'TV',
       'Movie',
       'OVA',
       'ONA',
       'Special',
-      'Music'
+      'TV Special',
+      'Music',
+      'CM',
+      'PV'
     ]);
   });
 

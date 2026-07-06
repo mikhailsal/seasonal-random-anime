@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 export type ImagePreloader = (url: string) => Promise<void>;
 
@@ -28,6 +28,8 @@ interface CycleContext {
   preload: ImagePreloader;
   setIndex: (index: number) => void;
   setLoading: (loading: boolean) => void;
+  /** Latest images reference; used to drop preloads that finish after the gallery changed. */
+  currentImages: () => readonly string[];
 }
 
 function advanceGallery(ctx: CycleContext): void {
@@ -40,7 +42,7 @@ function advanceGallery(ctx: CycleContext): void {
     .preload(url)
     .catch(() => undefined)
     .finally(() => {
-      ctx.setIndex(next);
+      if (ctx.currentImages() === ctx.images) ctx.setIndex(next);
       ctx.setLoading(false);
     });
 }
@@ -55,6 +57,10 @@ export function useImageGallery(
 ): GalleryApi {
   const [index, setIndex] = useState(0);
   const [loading, setLoading] = useState(false);
+  const imagesRef = useRef(images);
+  useEffect(() => {
+    imagesRef.current = images;
+  }, [images]);
   // Reset during render when the gallery changes (React "adjust state" pattern).
   const [prevImages, setPrevImages] = useState(images);
   if (prevImages !== images) {
@@ -63,7 +69,8 @@ export function useImageGallery(
   }
 
   const cycle = useCallback(() => {
-    advanceGallery({ images, index, preload, setIndex, setLoading });
+    const currentImages = (): readonly string[] => imagesRef.current;
+    advanceGallery({ images, index, preload, setIndex, setLoading, currentImages });
   }, [images, index, preload]);
 
   return { index, count: images.length, loading, cycle };

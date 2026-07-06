@@ -14,6 +14,7 @@ import { createDefaultServices, ServicesContext } from './services/context';
 import type { AppServices } from './services/context';
 import type { CheckboxOption } from './components/CheckboxGroup';
 
+/** Season for the user's local date (deliberately local, not UTC: it matches what the user perceives as "now"). */
 export function currentSeasonName(d = new Date()): SeasonName {
   const month = d.getMonth() + 1;
   if (month <= 3) return 'winter';
@@ -22,10 +23,15 @@ export function currentSeasonName(d = new Date()): SeasonName {
   return 'fall';
 }
 
+/**
+ * Known types first (stable order), then any unexpected types found in the
+ * data, so every loaded item stays selectable even if Jikan adds new types.
+ */
 export function buildTypeOptions(items: readonly AnimeItem[]): CheckboxOption[] {
   const present = new Set(items.map((i) => i.type));
-  const matched = KNOWN_TYPES.filter((t) => present.has(t));
-  const finalTypes = matched.length > 0 ? matched : KNOWN_TYPES;
+  const known = KNOWN_TYPES.filter((t) => present.has(t));
+  const unknown = [...present].filter((t) => !KNOWN_TYPES.includes(t)).sort();
+  const finalTypes = known.length + unknown.length > 0 ? [...known, ...unknown] : KNOWN_TYPES;
   return finalTypes.map((t) => ({ value: t, label: t }));
 }
 

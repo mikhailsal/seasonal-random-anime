@@ -11,6 +11,9 @@ export interface SelectionOptions {
   sleep?: (ms: number) => Promise<void>;
 }
 
+/** Legacy parity: cap the continuation-avoidance retries at 20 attempts. */
+export const MAX_CONTINUITY_ATTEMPTS = 20;
+
 const defaultSleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
 function randomOf<T>(source: readonly T[], rng: RNG): T {
@@ -44,8 +47,7 @@ export async function pickRandomConsideringContinuity(
   if (source.length === 0) return null;
   if (includeContinuations) return randomOf(source, rng);
 
-  const maxAttempts = Math.min(20, Math.max(20, source.length * 2));
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+  for (let attempt = 0; attempt < MAX_CONTINUITY_ATTEMPTS; attempt++) {
     const candidate = randomOf(source, rng);
     const isCont = await checkContinuation(candidate, isContinuation);
     if (!isCont) return candidate;

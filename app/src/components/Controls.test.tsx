@@ -70,6 +70,11 @@ describe('DurationFilters', () => {
       expect(parseDurationInput('-5')).toBe(0);
       expect(parseDurationInput('12.9')).toBe(12);
     });
+
+    it('returns null (not NaN) for non-numeric input', () => {
+      expect(parseDurationInput('abc')).toBeNull();
+      expect(parseDurationInput('e')).toBeNull();
+    });
   });
 });
 
@@ -94,5 +99,35 @@ describe('ImageGallery error fallback', () => {
       'src',
       placeholderImageUrl('Empty')
     );
+  });
+
+  it('clears the error fallback when a new gallery arrives', () => {
+    const preload = () => Promise.resolve();
+    const { rerender } = render(
+      <ImageGallery images={['https://cdn.test/broken.jpg']} title="Show" preload={preload} />
+    );
+    fireEvent.error(screen.getByRole('img', { name: 'Show' }));
+    expect(screen.getByRole('img', { name: 'Show' })).toHaveAttribute(
+      'src',
+      placeholderImageUrl('Show')
+    );
+    rerender(
+      <ImageGallery images={['https://cdn.test/fine.jpg']} title="Show" preload={preload} />
+    );
+    expect(screen.getByRole('img', { name: 'Show' })).toHaveAttribute(
+      'src',
+      'https://cdn.test/fine.jpg'
+    );
+  });
+
+  it('exposes the cycle action as an accessible button', () => {
+    render(
+      <ImageGallery
+        images={['https://cdn.test/a.jpg', 'https://cdn.test/b.jpg']}
+        title="Keyboard"
+        preload={() => Promise.resolve()}
+      />
+    );
+    expect(screen.getByRole('button', { name: 'Show next image of Keyboard' })).toBeInTheDocument();
   });
 });

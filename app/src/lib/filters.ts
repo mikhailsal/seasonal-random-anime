@@ -8,7 +8,18 @@ export interface EpisodeRange {
   label: string;
 }
 
-export const KNOWN_TYPES: readonly string[] = ['TV', 'Movie', 'OVA', 'ONA', 'Special', 'Music'];
+/** Anime types returned by Jikan v4 (`type` enum), in display order. */
+export const KNOWN_TYPES: readonly string[] = [
+  'TV',
+  'Movie',
+  'OVA',
+  'ONA',
+  'Special',
+  'TV Special',
+  'Music',
+  'CM',
+  'PV'
+];
 
 export const EPISODE_RANGES: readonly EpisodeRange[] = [
   { id: 'lt10', label: '< 10 episodes' },

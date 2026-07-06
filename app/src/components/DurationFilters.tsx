@@ -11,9 +11,9 @@ export interface DurationFiltersProps {
 }
 
 export function parseDurationInput(raw: string): number | null {
-  const trimmed = raw.trim();
-  if (trimmed === '') return null;
-  return Math.max(0, Number.parseInt(trimmed, 10));
+  const parsed = Number.parseInt(raw.trim(), 10);
+  if (Number.isNaN(parsed)) return null;
+  return Math.max(0, parsed);
 }
 
 interface MinutesInputProps {
