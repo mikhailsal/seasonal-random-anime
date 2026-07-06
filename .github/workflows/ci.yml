@@ -50,7 +50,7 @@ jobs:
       - name: Lint (ESLint, max-lines 400 / max-lines-per-function 25)
         run: npm run lint
       - name: Format check
-        run: npx prettier --check src e2e
+        run: npm run format
       - name: Typecheck (strict)
         run: npm run typecheck
       - name: Unit + functional tests with coverage gate (>=80%)

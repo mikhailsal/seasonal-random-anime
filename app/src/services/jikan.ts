@@ -51,9 +51,21 @@ export interface LoadSeasonOptions extends JikanOptions {
 
 const defaultSleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
+/** Jikan pagination can shift items between pages; keep the first occurrence per MAL id. */
+function pushDeduped(aggregated: Anime[], seen: Set<number>, items: readonly Anime[]): void {
+  for (const item of items) {
+    if (item.mal_id != null) {
+      if (seen.has(item.mal_id)) continue;
+      seen.add(item.mal_id);
+    }
+    aggregated.push(item);
+  }
+}
+
 /**
  * Progressively load a season: paginate up to `maxPages` pages of 25 items
- * with a gentle delay between pages (legacy parity: 5 pages, 350ms).
+ * with a gentle delay between pages (legacy parity: 5 pages, 350ms),
+ * de-duplicated by `mal_id`.
  */
 export async function loadFullSeason(
   year: number,
@@ -62,11 +74,12 @@ export async function loadFullSeason(
 ): Promise<Anime[]> {
   const { maxPages = 5, pageDelayMs = 350, sleep = defaultSleep, ...jikan } = options;
   const aggregated: Anime[] = [];
+  const seen = new Set<number>();
   let page = 1;
   let hasNext = true;
   while (hasNext && page <= maxPages) {
     const resp = await getSeasonPage(year, season, { page, limit: 25, ...jikan });
-    aggregated.push(...resp.data);
+    pushDeduped(aggregated, seen, resp.data);
     hasNext = resp.pagination?.has_next_page === true;
     page += 1;
     if (hasNext && page <= maxPages) await sleep(pageDelayMs);

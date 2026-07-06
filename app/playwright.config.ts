@@ -12,8 +12,10 @@ export default defineConfig({
     trace: 'retain-on-failure'
   },
   webServer: {
-    command: 'npx vite --port 4173 --strictPort',
+    // Build first so e2e always exercises the production bundle (not the dev server).
+    command: 'npx vite build && npx vite preview --port 4173 --strictPort',
     url: BASE_URL,
+    timeout: 120_000,
     reuseExistingServer: !process.env.CI
   }
 });
