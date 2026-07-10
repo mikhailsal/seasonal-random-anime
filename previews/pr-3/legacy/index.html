@@ -1,0 +1,1696 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seasonal Random Anime</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .header {
+            background: #2e51a2;
+            color: white;
+            padding: 1rem 0;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        /* Two-pane layout */
+        .app-layout {
+            display: flex;
+            gap: 1.5rem;
+            align-items: flex-start;
+        }
+
+        .sidebar {
+            width: 420px;
+            background: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+            padding: 1rem;
+            transition: width 0.25s ease, padding 0.25s ease, opacity 0.2s ease;
+            position: sticky;
+            top: 1rem;
+            max-height: none;
+            overflow: visible;
+        }
+
+        .content {
+            flex: 1;
+            min-width: 0; /* prevent overflow */
+        }
+
+        body.sidebar-collapsed .sidebar {
+            width: 0;
+            padding: 0;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* toggle button in header */
+        .header { position: relative; }
+        .toggle-sidebar {
+            position: absolute;
+            left: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(255,255,255,0.2);
+            color: #fff;
+            border: 1px solid rgba(255,255,255,0.35);
+            padding: 0.35rem 0.6rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.2s ease, transform 0.1s ease;
+        }
+        .toggle-sidebar:hover { background: rgba(255,255,255,0.3); }
+
+        .settings-group { margin-top: 1rem; }
+        .settings-group h3 {
+            color: #2e51a2;
+            font-size: 1rem;
+            margin-bottom: 0.5rem;
+        }
+        .muted { color: #64748b; font-size: 0.9rem; }
+
+        /* Filters */
+        .filter-section { margin-top: 1rem; }
+        .checkbox-list {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.35rem 0.75rem;
+            max-height: 220px;
+            overflow: auto;
+            padding-right: 4px;
+        }
+        /* Genres: 3 columns on wide screens */
+        #genreFilters.checkbox-list { grid-template-columns: repeat(3, 1fr); }
+        .checkbox-list label { display: flex; align-items: center; gap: 0.45rem; font-size: 0.95rem; }
+        .match-row { display: flex; align-items: center; justify-content: space-between; margin-top: 0.75rem; }
+        .match-count { color: #1f2937; font-weight: 600; }
+        .clear-btn { background: #e5e7eb; color: #111827; border: none; border-radius: 8px; padding: 0.4rem 0.6rem; cursor: pointer; }
+        .clear-btn:hover { background: #d1d5db; }
+        .match-actions { display: flex; gap: 0.35rem; flex-wrap: wrap; }
+
+        .duration-controls { display: grid; grid-template-columns: 1fr; gap: 0.5rem; }
+        .duration-controls input[type="number"] {
+            padding: 0.35rem 0.5rem;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            width: 90px;
+            font-size: 0.9rem;
+        }
+        .duration-row { display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap; }
+        .duration-row .muted { font-size: 0.85rem; }
+
+        .picker-section {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+
+        .season-controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1rem;
+        }
+
+        .season-controls select {
+            padding: 0.6rem 0.8rem;
+            border: 1px solid #cbd5e1;
+            border-radius: 10px;
+            background: white;
+            color: #1f2937;
+            font-size: 1rem;
+            min-width: 130px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+
+        .pick-button {
+            background: #ff6b35;
+            color: white;
+            border: none;
+            padding: 1rem 2rem;
+            font-size: 1.2rem;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(255, 107, 53, 0.3);
+        }
+
+        .pick-button:hover {
+            background: #e55a2b;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(255, 107, 53, 0.4);
+        }
+
+        .pick-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .pick-button:disabled:hover {
+            background: #ccc;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .anime-card {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            overflow: hidden;
+            /* Align the card top with the sidebar top */
+            margin: 0 auto 2rem;
+            max-width: 800px;
+            display: none;
+            animation: fadeIn 0.5s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .anime-header {
+            background: linear-gradient(135deg, #2e51a2, #4a69bd);
+            color: white;
+            padding: 1.25rem 1.5rem;
+            text-align: center;
+        }
+
+        .anime-title {
+            font-size: 2rem;
+            font-weight: bold;
+            line-height: 1.2;
+            margin-bottom: 0.35rem;
+        }
+
+        .anime-stats {
+            display: flex;
+            justify-content: center;
+            gap: 1.25rem;
+            margin-top: 0.75rem;
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #ffd700;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+        .anime-content {
+            padding: 2rem;
+        }
+
+        .anime-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 10px;
+            float: left;
+            margin-right: 2rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+
+        .anime-image:hover {
+            transform: scale(1.02);
+        }
+
+        .image-counter {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 0.3rem 0.6rem;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+
+        .anime-image-container {
+            position: relative;
+            display: inline-block;
+            float: left;
+            margin-right: 2rem;
+            margin-bottom: 1rem;
+            width: min(350px, 100%);
+            aspect-ratio: 2 / 3; /* Reserve poster space (2:3) */
+            background: rgba(0,0,0,0.08);
+            border-radius: 10px;
+        }
+
+        .image-loading-overlay {
+            position: absolute;
+            inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0,0,0,0.25);
+            border-radius: 10px;
+            z-index: 2;
+        }
+        .image-loading-overlay.active { display: flex; }
+        .image-spinner {
+            width: 28px;
+            height: 28px;
+            border: 3px solid rgba(255,255,255,0.4);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .anime-details {
+            overflow: hidden;
+        }
+
+        .genres {
+            margin-bottom: 1rem;
+        }
+
+        .genre-tag {
+            display: inline-block;
+            background: #e3f2fd;
+            color: #1976d2;
+            padding: 0.3rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            margin-right: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .description {
+            line-height: 1.6;
+            margin-bottom: 1.5rem;
+            text-align: justify;
+        }
+
+        .mal-link {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: #2e51a2;
+            color: white;
+            padding: 0.75rem 1.25rem;
+            text-decoration: none;
+            border-radius: 25px;
+            transition: all 0.3s ease;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .mal-link:hover {
+            background: #1e3a8a;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(46, 81, 162, 0.3);
+        }
+
+        .api-details {
+            margin-top: 2rem;
+            padding: 1.5rem;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border-left: 4px solid #2e51a2;
+        }
+
+        .api-section {
+            margin-bottom: 1.5rem;
+        }
+
+        .api-section h3 {
+            color: #2e51a2;
+            margin-bottom: 0.8rem;
+            font-size: 1.2rem;
+            border-bottom: 2px solid #e3f2fd;
+            padding-bottom: 0.5rem;
+        }
+
+        .api-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .api-item {
+            background: white;
+            padding: 0.8rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .api-label {
+            font-weight: bold;
+            color: #555;
+            margin-bottom: 0.2rem;
+            font-size: 0.9rem;
+        }
+
+        .api-value {
+            color: #333;
+            line-height: 1.3;
+            font-size: 0.95rem;
+        }
+
+        .tag-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.3rem;
+        }
+
+        .api-tag {
+            background: #e8f4f8;
+            color: #2e51a2;
+            padding: 0.15rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            border: 1px solid #d1ecf1;
+        }
+
+        .synopsis-text {
+            line-height: 1.6;
+            text-align: justify;
+            max-height: 200px;
+            overflow-y: auto;
+            padding-right: 10px;
+        }
+
+        .synopsis-text::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .synopsis-text::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 3px;
+        }
+
+        .synopsis-text::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 3px;
+        }
+
+        .synopsis-text::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8;
+        }
+
+        .anime-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; margin-top: 1rem; }
+        .trailer-link {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: #ff4444;
+            color: white;
+            padding: 0.75rem 1.25rem;
+            text-decoration: none;
+            border-radius: 25px;
+            transition: all 0.3s ease;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .trailer-link:hover {
+            background: #cc0000;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(255, 68, 68, 0.3);
+        }
+
+        .no-api-data {
+            text-align: center;
+            padding: 2rem;
+            color: #666;
+            font-style: italic;
+            background: #f8f9fa;
+            border-radius: 10px;
+            margin-top: 1rem;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: white;
+            font-size: 1.2rem;
+        }
+        /* Make loading text readable inside sidebar */
+        .sidebar .loading { color: #1f2937; padding: 0.75rem; }
+
+        @media (max-width: 1024px) {
+            .app-layout { flex-direction: column; }
+            .sidebar { width: 100%; position: relative; top: 0; max-height: none; }
+        }
+
+        @media (max-width: 768px) {
+            .anime-image-container {
+                float: none;
+                display: block;
+                margin: 0 auto 1rem auto;
+                width: min(320px, 100%);
+            }
+            .anime-image { margin: 0; }
+            
+            .anime-stats {
+                flex-direction: column;
+                gap: 1rem;
+            }
+            
+            .container {
+                padding: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <button id="toggleSidebarBtn" class="toggle-sidebar" type="button" aria-expanded="true" aria-controls="sidebar" title="Hide/Show settings">☰</button>
+        <h1>🎌 Seasonal Random Anime</h1>
+        <p>Discover your next anime adventure. Season: <span id="currentSeasonLabel">Spring 2025</span></p>
+    </div>
+
+    <div class="container">
+        <div class="app-layout">
+            <aside id="sidebar" class="sidebar">
+        <div class="picker-section">
+                    <div class="season-controls">
+                        <select id="seasonYearSelect" aria-label="Select Year"></select>
+                        <select id="seasonSelect" aria-label="Select Season">
+                            <option value="winter">Winter</option>
+                            <option value="spring" selected>Spring</option>
+                            <option value="summer">Summer</option>
+                            <option value="fall">Fall</option>
+                        </select>
+                    </div>
+                    <button class="pick-button" onclick="pickRandomAnime()" id="pickButton" type="button">
+                🎲 Pick Random Anime
+            </button>
+        </div>
+
+                <div id="seasonLoading" class="loading" style="display: none;">
+                    Loading season list...
+                </div>
+
+                <div id="settingsBody">
+                <div class="settings-group filter-section">
+                    <h3 id="typeFiltersLabel">Type</h3>
+                    <div id="typeFilters" class="checkbox-list" role="group" aria-labelledby="typeFiltersLabel">
+                        <!-- Filled by JS -->
+                    </div>
+                </div>
+
+                <div class="settings-group filter-section">
+                    <h3 id="durationFiltersLabel">Duration</h3>
+                    <div class="duration-controls" role="group" aria-labelledby="durationFiltersLabel">
+                        <label><input type="checkbox" id="includeShortsCheckbox"> Include shorts (&lt; 15 min)</label>
+                        <div class="duration-row">
+                            <label for="minDurationInput" class="muted">Min</label>
+                            <input id="minDurationInput" type="number" min="0" placeholder="minutes">
+                            <label for="maxDurationInput" class="muted">Max</label>
+                            <input id="maxDurationInput" type="number" min="0" placeholder="minutes">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="settings-group filter-section">
+                    <h3 id="continuityFiltersLabel">Series continuity</h3>
+                    <label><input type="checkbox" id="includeContinuationsCheckbox"> Include continuations (Season 2+, sequels)</label>
+                    <div class="muted">When off (default), random picks avoid titles that have a prequel.</div>
+                </div>
+
+                <div class="settings-group filter-section">
+                    <h3 id="episodeFiltersLabel">Episodes</h3>
+                    <div id="episodeFilters" class="checkbox-list" role="group" aria-labelledby="episodeFiltersLabel">
+                        <!-- Filled by JS -->
+                    </div>
+                </div>
+
+                <div class="settings-group filter-section">
+                    <h3 id="genreFiltersLabel">Genres</h3>
+                    <div id="genreFilters" class="checkbox-list" role="group" aria-labelledby="genreFiltersLabel">
+                        <!-- Filled by JS -->
+                    </div>
+                <div class="match-row">
+                        <span class="match-count">Matches: <span id="matchCount">0</span></span>
+                        <div class="match-actions">
+                            <button id="clearFiltersBtn" class="clear-btn" type="button" title="Select all types and genres">All</button>
+                            <button id="selectNoneFiltersBtn" class="clear-btn" type="button" title="Uncheck all types and genres">None</button>
+                            <button id="defaultsFiltersBtn" class="clear-btn" type="button" title="Reset to defaults">Defaults</button>
+                        </div>
+                    </div>
+                </div>
+                </div>
+            </aside>
+
+            <main class="content">
+        <div id="loading" class="loading" style="display: none;">
+            Selecting your anime...
+        </div>
+
+        <div id="imageLoading" class="loading" style="display: none;">
+            🔄 Loading real anime images... This may take a moment.
+        </div>
+
+        <div id="animeCard" class="anime-card">
+            <!-- Anime details will be populated here -->
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script>
+        let animeList = [];
+        let selectedSeason = 'spring';
+        let selectedYear = 2025;
+        let currentDisplayedAnime = null;
+        let isSidebarCollapsed = false;
+        // Defaults
+        const DEFAULT_TYPE_FILTERS = new Set(['TV', 'OVA', 'ONA']);
+        const DEFAULT_GENRE_FILTERS = new Set([
+            'Action', 'Adventure', 'Comedy', 'Drama', 'Fantasy', 'Mystery',
+            'Gourmet', 'Romance', 'Sci-Fi', 'Slice of Life', 'Sports', 'Supernatural', 'Suspense'
+        ]);
+        // New logic: checkbox means INCLUDE shorts when checked; default = exclude shorts
+        const DEFAULT_EXCLUDE_SHORTS = true;
+        // Episodes filters defaults
+        const DEFAULT_EPISODE_FILTERS = new Set(['10to16', '17to28']);
+
+        let filteredAnimeList = [];
+        let activeTypeFilters = new Set(DEFAULT_TYPE_FILTERS);
+        let activeGenreFilters = new Set(DEFAULT_GENRE_FILTERS);
+        let activeEpisodeFilters = new Set(DEFAULT_EPISODE_FILTERS);
+        let excludeShorts = DEFAULT_EXCLUDE_SHORTS;
+        let minDurationMin = null; // minutes
+        let maxDurationMin = null; // minutes
+        // Continuations control (default: exclude continuations)
+        let includeContinuations = false;
+        // Cache for continuation checks by MAL ID
+        const continuationCache = new Map(); // mal_id -> boolean (true if continuation)
+
+        // Utility helpers
+        const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+        const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+
+        // Fetch list of available seasons/years and populate controls
+        async function initializeSeasonControls() {
+            const yearSelect = document.getElementById('seasonYearSelect');
+            const seasonSelect = document.getElementById('seasonSelect');
+            const seasonLoading = document.getElementById('seasonLoading');
+            seasonLoading.textContent = 'Loading available seasons...';
+            seasonLoading.style.display = 'block';
+
+            try {
+                // Try to get official seasons metadata
+                const resp = await fetch('https://api.jikan.moe/v4/seasons');
+                let years = [];
+                if (resp.ok) {
+                    const data = await resp.json();
+                    // data.data is array of { year, seasons: ['winter','spring','summer','fall'] }
+                    years = (data.data || []).map(y => y.year).sort((a,b) => b - a);
+                }
+                // Fallback: generate a reasonable range if API fails
+                if (!years || years.length === 0) {
+                    const currentYear = new Date().getFullYear();
+                    for (let y = currentYear + 1; y >= 2000; y--) years.push(y);
+                }
+
+                // Populate year select
+                yearSelect.innerHTML = years.map(y => `<option value="${y}">${y}</option>`).join('');
+                // Set defaults
+                yearSelect.value = String(selectedYear);
+                seasonSelect.value = selectedSeason;
+            } catch (e) {
+                console.warn('Failed to load seasons metadata, using fallback years', e);
+            } finally {
+                seasonLoading.style.display = 'none';
+            }
+
+            // Auto-load on change with debounce
+            let debounceTimer;
+            const triggerLoad = () => {
+                window.clearTimeout(debounceTimer);
+                debounceTimer = window.setTimeout(async () => {
+                    selectedYear = parseInt(yearSelect.value, 10);
+                    selectedSeason = seasonSelect.value;
+                    await loadSeasonData(selectedYear, selectedSeason);
+                }, 200);
+            };
+            yearSelect.addEventListener('change', triggerLoad);
+            seasonSelect.addEventListener('change', triggerLoad);
+        }
+
+        // Load anime list for specific season from Jikan API
+        async function loadSeasonData(year, season) {
+            const seasonLoading = document.getElementById('seasonLoading');
+            const pickButton = document.getElementById('pickButton');
+            const sidebar = document.getElementById('sidebar');
+            const settingsBody = document.getElementById('settingsBody');
+            seasonLoading.textContent = `Loading ${capitalize(season)} ${year} anime...`;
+            seasonLoading.style.display = 'block';
+            pickButton.disabled = true;
+            // disable sidebar controls
+            if (sidebar) {
+                sidebar.querySelectorAll('select, input, button').forEach(el => el.disabled = true);
+            }
+            if (settingsBody) settingsBody.style.display = 'none';
+
+            try {
+                let page = 1;
+                let hasNext = true;
+                const aggregated = [];
+                // Paginate; cap to avoid very long waits
+                while (hasNext && page <= 5) {
+                    const url = `https://api.jikan.moe/v4/seasons/${year}/${season}?page=${page}&limit=25`;
+                    const resp = await fetch(url);
+                    if (!resp.ok) {
+                        if (resp.status === 429) {
+                            // Rate limited; back off
+                            await sleep(800);
+                            continue;
+                        }
+                        throw new Error(`Failed to load season page ${page}`);
+                    }
+                    const data = await resp.json();
+                    const items = data.data || [];
+                    aggregated.push(...items);
+                    hasNext = data.pagination?.has_next_page === true;
+                    page += 1;
+                    // Gentle delay to respect rate limits
+                    if (hasNext) await sleep(350);
+                }
+
+                animeList = aggregated.map(a => {
+                    const imageUrls = [];
+                    if (a.images?.jpg?.large_image_url) imageUrls.push(a.images.jpg.large_image_url);
+                    if (a.images?.jpg?.image_url && !imageUrls.includes(a.images.jpg.image_url)) imageUrls.push(a.images.jpg.image_url);
+                    if (a.images?.webp?.large_image_url && !imageUrls.includes(a.images.webp.large_image_url)) imageUrls.push(a.images.webp.large_image_url);
+
+                    const genres = Array.isArray(a.genres) ? a.genres.map(g => g.name).filter(Boolean) : [];
+
+                    return {
+                        title: a.title || a.title_english || a.title_japanese || 'Untitled',
+                        rating: typeof a.score === 'number' ? a.score : 'N/A',
+                        popularity: (typeof a.members === 'number') ? a.members.toLocaleString() : (a.popularity ? `#${a.popularity}` : 'N/A'),
+                        episodes: a.episodes ?? 'N/A',
+                        type: a.type || 'Unknown',
+                        genres,
+                        description: a.synopsis || 'No description available.',
+                        images: imageUrls.length > 0 ? imageUrls : null,
+                        currentImageIndex: 0,
+                        link: a.url || (a.mal_id ? `https://myanimelist.net/anime/${a.mal_id}` : '#'),
+                        apiData: { ...a }
+                    };
+                }).filter(x => x);
+
+                // Update header label
+                const label = document.getElementById('currentSeasonLabel');
+                if (label) label.textContent = `${capitalize(season)} ${year}`;
+
+                console.log(`Loaded ${animeList.length} anime from Jikan for ${season} ${year}`);
+
+                // After loading, (re)build filters and apply them
+                buildTypeFilters();
+                buildGenreFilters();
+                bindDurationFilters();
+                buildEpisodeFilters();
+                applyFilters();
+            } catch (err) {
+                console.error('Error loading season data:', err);
+                alert('Failed to load season data. Please try again or choose another season.');
+            } finally {
+                seasonLoading.style.display = 'none';
+                pickButton.disabled = false;
+                if (sidebar) {
+                    sidebar.querySelectorAll('select, input, button').forEach(el => el.disabled = false);
+                }
+                if (settingsBody) settingsBody.style.display = '';
+            }
+        }
+
+        // Build type filters from known set
+        function buildTypeFilters() {
+            const container = document.getElementById('typeFilters');
+            if (!container) return;
+            const knownTypes = ['TV', 'Movie', 'OVA', 'ONA', 'Special', 'Music'];
+            const presentTypes = new Set(animeList.map(a => a.type).filter(Boolean));
+            const renderTypes = knownTypes.filter(t => presentTypes.has(t));
+            // Fallback: if none matched, show all known types
+            const finalTypes = renderTypes.length > 0 ? renderTypes : knownTypes;
+
+            container.innerHTML = finalTypes.map(t => {
+                const id = `type-${t.toLowerCase()}`;
+                const checked = (activeTypeFilters === null) ? 'checked' : (activeTypeFilters.has(t) ? 'checked' : '');
+                return `<label for="${id}"><input type="checkbox" id="${id}" value="${t}" ${checked}/> ${t}</label>`;
+            }).join('');
+
+            container.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+                cb.addEventListener('change', () => {
+                    const selected = Array.from(container.querySelectorAll('input[type="checkbox"]:checked')).map(i => i.value);
+                    activeTypeFilters = new Set(selected);
+                    applyFilters();
+                });
+            });
+        }
+
+        // Build genre filters dynamically from current list
+        function buildGenreFilters() {
+            const container = document.getElementById('genreFilters');
+            if (!container) return;
+            const allGenres = new Set();
+            animeList.forEach(a => (a.genres || []).forEach(g => allGenres.add(g)));
+            const sortedGenres = Array.from(allGenres).sort((a,b) => a.localeCompare(b));
+            container.innerHTML = sortedGenres.map(g => {
+                const id = `genre-${g.toLowerCase().replace(/\s+/g,'-')}`;
+                const checked = (activeGenreFilters === null) ? 'checked' : (activeGenreFilters.has(g) ? 'checked' : '');
+                return `<label for="${id}"><input type="checkbox" id="${id}" value="${g}" ${checked}/> ${g}</label>`;
+            }).join('');
+
+            container.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+                cb.addEventListener('change', () => {
+                    const selected = Array.from(container.querySelectorAll('input[type="checkbox"]:checked')).map(i => i.value);
+                    activeGenreFilters = new Set(selected);
+                    applyFilters();
+                });
+            });
+
+            // Filters control buttons
+            const clearBtn = document.getElementById('clearFiltersBtn'); // All
+            const selectNoneBtn = document.getElementById('selectNoneFiltersBtn');
+            const defaultsBtn = document.getElementById('defaultsFiltersBtn');
+
+            if (clearBtn) {
+                // Select all types and genres present
+                clearBtn.onclick = () => {
+                    activeTypeFilters = null;
+                    activeGenreFilters = null;
+                    activeEpisodeFilters = null;
+                    // Include shorts when selecting all
+                    excludeShorts = false;
+                    buildTypeFilters();
+                    buildGenreFilters();
+                    buildEpisodeFilters();
+                    const includeCbAll = document.getElementById('includeShortsCheckbox');
+                    if (includeCbAll) includeCbAll.checked = true;
+                    applyFilters();
+                };
+            }
+            if (selectNoneBtn) {
+                // Uncheck all
+                selectNoneBtn.onclick = () => {
+                    activeTypeFilters = new Set();
+                    activeGenreFilters = new Set();
+                    activeEpisodeFilters = new Set();
+                    // Exclude shorts when selecting none (unchecked Include shorts)
+                    excludeShorts = true;
+                    buildTypeFilters();
+                    buildGenreFilters();
+                    buildEpisodeFilters();
+                    const includeCbNone = document.getElementById('includeShortsCheckbox');
+                    if (includeCbNone) includeCbNone.checked = false;
+                    applyFilters();
+                };
+            }
+            if (defaultsBtn) {
+                // Reset to opinionated defaults
+                defaultsBtn.onclick = () => {
+                    activeTypeFilters = new Set(DEFAULT_TYPE_FILTERS);
+                    activeGenreFilters = new Set(DEFAULT_GENRE_FILTERS);
+                    activeEpisodeFilters = new Set(DEFAULT_EPISODE_FILTERS);
+                    excludeShorts = DEFAULT_EXCLUDE_SHORTS;
+                    buildTypeFilters();
+                    buildGenreFilters();
+                    buildEpisodeFilters();
+                    const includeCb2 = document.getElementById('includeShortsCheckbox');
+                    if (includeCb2) includeCb2.checked = !excludeShorts;
+                    applyFilters();
+                };
+            }
+        }
+
+        // Build episode filters (static four ranges)
+        function buildEpisodeFilters() {
+            const container = document.getElementById('episodeFilters');
+            if (!container) return;
+            const ranges = [
+                { id: 'lt10', label: '< 10 episodes' },
+                { id: '10to16', label: '10–16 episodes' },
+                { id: '17to28', label: '17–28 episodes' },
+                { id: 'gt28', label: '> 28 episodes' }
+            ];
+
+            container.innerHTML = ranges.map(r => {
+                const id = `ep-${r.id}`;
+                const checked = (activeEpisodeFilters === null) ? 'checked' : (activeEpisodeFilters.has(r.id) ? 'checked' : '');
+                return `<label for="${id}"><input type="checkbox" id="${id}" value="${r.id}" ${checked}/> ${r.label}</label>`;
+            }).join('');
+
+            container.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+                cb.addEventListener('change', () => {
+                    const selected = Array.from(container.querySelectorAll('input[type="checkbox"]:checked')).map(i => i.value);
+                    activeEpisodeFilters = new Set(selected);
+                    applyFilters();
+                });
+            });
+        }
+
+        function applyFilters() {
+            const typeSet = activeTypeFilters;    // null → no restriction; Set → restricted
+            const genreSet = activeGenreFilters;  // null → no restriction; Set → restricted
+            const episodeSet = activeEpisodeFilters; // null → no restriction; Set → restricted
+
+            filteredAnimeList = animeList.filter(a => {
+                // Type filter
+                if (typeSet !== null) {
+                    // Empty set means none selected → reject all
+                    if (typeSet.size === 0) return false;
+                    if (!typeSet.has(a.type)) return false;
+                }
+
+                // Genre filter
+                if (genreSet !== null) {
+                    if (genreSet.size === 0) return false;
+                    const aGenres = Array.isArray(a.genres) ? a.genres : [];
+                    if (aGenres.length === 0) return false;
+                    for (const g of aGenres) {
+                        if (!genreSet.has(g)) return false;
+                    }
+                }
+                // Episodes filter
+                if (episodeSet !== null) {
+                    if (episodeSet.size === 0) return false;
+                    const ep = (typeof a.episodes === 'number') ? a.episodes : (typeof a.apiData?.episodes === 'number' ? a.apiData.episodes : null);
+                    if (typeof ep !== 'number') return false;
+                    let match = false;
+                    if (episodeSet.has('lt10') && ep < 10) match = true;
+                    if (episodeSet.has('10to16') && ep >= 10 && ep <= 16) match = true;
+                    if (episodeSet.has('17to28') && ep >= 17 && ep <= 28) match = true;
+                    if (episodeSet.has('gt28') && ep > 28) match = true;
+                    if (!match) return false;
+                }
+                // Duration filter
+                const durationMin = parseDurationToMinutes(a.apiData?.duration);
+                if (excludeShorts && typeof durationMin === 'number' && durationMin < 15) return false; // exclude when flag true
+                if (typeof minDurationMin === 'number' && typeof durationMin === 'number' && durationMin < minDurationMin) return false;
+                if (typeof maxDurationMin === 'number' && typeof durationMin === 'number' && durationMin > maxDurationMin) return false;
+                return true;
+            });
+
+            const matchEl = document.getElementById('matchCount');
+            if (matchEl) matchEl.textContent = String(filteredAnimeList.length);
+        }
+
+        function bindDurationFilters() {
+            const includeCb = document.getElementById('includeShortsCheckbox');
+            const minInput = document.getElementById('minDurationInput');
+            const maxInput = document.getElementById('maxDurationInput');
+            if (includeCb) {
+                // Reflect default state in UI (checked = include shorts)
+                includeCb.checked = !excludeShorts;
+                includeCb.onchange = () => { excludeShorts = !includeCb.checked; applyFilters(); };
+            }
+            if (minInput) {
+                if (typeof minDurationMin === 'number') minInput.value = String(minDurationMin);
+            }
+            if (maxInput) {
+                if (typeof maxDurationMin === 'number') maxInput.value = String(maxDurationMin);
+            }
+            if (minInput) {
+                minInput.oninput = () => {
+                    const v = minInput.value.trim();
+                    minDurationMin = v === '' ? null : Math.max(0, parseInt(v, 10));
+                    applyFilters();
+                };
+            }
+            if (maxInput) {
+                maxInput.oninput = () => {
+                    const v = maxInput.value.trim();
+                    maxDurationMin = v === '' ? null : Math.max(0, parseInt(v, 10));
+                    applyFilters();
+                };
+            }
+        }
+
+        // Bind the "Include continuations" checkbox
+        function bindContinuityFilter() {
+            const cb = document.getElementById('includeContinuationsCheckbox');
+            if (cb) {
+                cb.checked = includeContinuations;
+                cb.onchange = () => { includeContinuations = cb.checked; };
+            }
+        }
+
+        // Convert Jikan duration string like "24 min per ep", "1 hr 30 min" → minutes
+        function parseDurationToMinutes(durationStr) {
+            if (!durationStr || typeof durationStr !== 'string') return null;
+            const s = durationStr.toLowerCase();
+            let total = 0;
+            // Handle hours
+            const hrMatch = s.match(/(\d+)\s*hr/);
+            if (hrMatch) total += parseInt(hrMatch[1], 10) * 60;
+            // Handle minutes
+            const minMatch = s.match(/(\d+)\s*min/);
+            if (minMatch) total += parseInt(minMatch[1], 10);
+            return total > 0 ? total : null;
+        }
+
+        // Check via MAL relations whether the anime is a continuation (has a prequel)
+        async function isContinuationByRelations(malId) {
+            if (!malId) return false;
+            if (continuationCache.has(malId)) return continuationCache.get(malId);
+            try {
+                let attempts = 0;
+                while (attempts < 2) {
+                    const resp = await fetch(`https://api.jikan.moe/v4/anime/${malId}/relations`);
+                    if (resp.status === 429) {
+                        // Rate limited; brief backoff and retry once
+                        attempts += 1;
+                        await sleep(800);
+                        continue;
+                    }
+                    if (!resp.ok) break;
+                    const data = await resp.json();
+                    const isCont = Array.isArray(data?.data) && data.data.some(rel =>
+                        typeof rel?.relation === 'string' && rel.relation.toLowerCase() === 'prequel' && Array.isArray(rel.entry) && rel.entry.length > 0
+                    );
+                    continuationCache.set(malId, isCont);
+                    return isCont;
+                }
+            } catch (e) {
+                // Ignore errors; assume not a continuation
+            }
+            continuationCache.set(malId, false);
+            return false;
+        }
+
+        // Pick a random anime, skipping continuations when requested
+        async function pickRandomConsideringContinuity(source, maxAttempts = 20) {
+            if (includeContinuations) {
+                return source[Math.floor(Math.random() * source.length)];
+            }
+            const attemptsLimit = Math.min(maxAttempts, Math.max(20, source.length * 2));
+            for (let i = 0; i < attemptsLimit; i++) {
+                const candidate = source[Math.floor(Math.random() * source.length)];
+                const malId = candidate?.apiData?.mal_id;
+                const isCont = await isContinuationByRelations(malId);
+                if (!isCont) return candidate;
+                // Gentle pacing to respect rate-limits when skipping many
+                await sleep(150);
+            }
+            // Fallback to any random candidate if we failed to find a non-continuation
+            return source[Math.floor(Math.random() * source.length)];
+        }
+
+        // Load image for a specific anime on demand
+        async function loadAnimeImage(anime) {
+            // Avoid repeated augmentation
+            if (anime.galleryAugmented === true && Array.isArray(anime.images) && anime.images.length > 0) {
+                return anime.images;
+            }
+            
+            console.log(`Loading/augmenting images for: ${anime.title}`);
+            
+            // Helpers for quality + dedupe
+            const imageMap = new Map(); // key -> { url, rank }
+            const considerCandidate = (url, hint) => {
+                if (!url) return;
+                const normalizeKeyFromUrl = (u) => {
+                    try {
+                        const obj = new URL(u);
+                        let path = obj.pathname;
+                        // remove any MAL resize segments like /r/120x120
+                        path = path.replace(/\/r\/[^/]+/g, '');
+                        // drop extension
+                        path = path.replace(/\.[a-zA-Z0-9]+$/, '');
+                        // remove trailing 'l' that denotes large variant in filename base
+                        path = path.replace(/l$/, '');
+                        return path.toLowerCase();
+                    } catch {
+                        return String(u);
+                    }
+                };
+                const getRank = (h) => {
+                    switch (h) {
+                        case 'webp_large': return 3;
+                        case 'webp': return 2;
+                        case 'jpg_large': return 1;
+                        case 'jpg': return 0;
+                        default: return 0;
+                    }
+                };
+                const key = normalizeKeyFromUrl(url);
+                const rank = getRank(hint);
+                const current = imageMap.get(key);
+                if (!current || rank > current.rank) {
+                    imageMap.set(key, { url, rank });
+                }
+            };
+            
+            // Seed with any existing images (assume JPG large for seeded URLs)
+            if (Array.isArray(anime.images)) {
+                for (const u of anime.images) considerCandidate(u, /\.webp(\?|$)/.test(u) ? 'webp_large' : 'jpg_large');
+            }
+            
+            // Known working image URLs for popular anime (as backup seed)
+            const knownImages = {
+                "Solo Leveling Season 2: Arise from the Shadow": ["https://cdn.myanimelist.net/images/anime/1801/142390l.jpg"],
+                "Sakamoto Days": ["https://cdn.myanimelist.net/images/anime/1026/146459l.jpg"],
+                "The Apothecary Diaries Season 2": ["https://cdn.myanimelist.net/images/anime/1508/150885l.jpg"]
+            };
+            if (knownImages[anime.title]) {
+                for (const url of knownImages[anime.title]) considerCandidate(url, 'jpg_large');
+            }
+            
+            // Prefer mal_id if we already have it
+            let malId = anime?.apiData?.mal_id;
+            
+            try {
+                // If no mal_id, try to resolve by search and also collect cover images (best-first)
+                if (!malId) {
+                    const searchQuery = encodeURIComponent(anime.title.replace(/Season \d+.*/, '').trim());
+                    const response = await fetch(`https://api.jikan.moe/v4/anime?q=${searchQuery}&limit=1`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (Array.isArray(data?.data) && data.data.length > 0) {
+                            const apiAnime = data.data[0];
+                            malId = apiAnime?.mal_id;
+                            // Prefer best: WEBP large > WEBP > JPG large > JPG
+                            considerCandidate(apiAnime?.images?.webp?.large_image_url, 'webp_large');
+                            considerCandidate(apiAnime?.images?.webp?.image_url, 'webp');
+                            considerCandidate(apiAnime?.images?.jpg?.large_image_url, 'jpg_large');
+                            considerCandidate(apiAnime?.images?.jpg?.image_url, 'jpg');
+                            // Persist core api data if not present
+                            if (!anime.apiData) {
+                                anime.apiData = {
+                                    mal_id: apiAnime.mal_id,
+                                    url: apiAnime.url,
+                                    title: apiAnime.title,
+                                    title_english: apiAnime.title_english,
+                                    title_japanese: apiAnime.title_japanese,
+                                    type: apiAnime.type,
+                                    source: apiAnime.source,
+                                    episodes: apiAnime.episodes,
+                                    status: apiAnime.status,
+                                    aired: apiAnime.aired,
+                                    duration: apiAnime.duration,
+                                    rating: apiAnime.rating,
+                                    score: apiAnime.score,
+                                    scored_by: apiAnime.scored_by,
+                                    rank: apiAnime.rank,
+                                    popularity: apiAnime.popularity,
+                                    members: apiAnime.members,
+                                    favorites: apiAnime.favorites,
+                                    synopsis: apiAnime.synopsis,
+                                    background: apiAnime.background,
+                                    season: apiAnime.season,
+                                    year: apiAnime.year,
+                                    broadcast: apiAnime.broadcast,
+                                    producers: apiAnime.producers,
+                                    licensors: apiAnime.licensors,
+                                    studios: apiAnime.studios,
+                                    genres: apiAnime.genres,
+                                    explicit_genres: apiAnime.explicit_genres,
+                                    themes: apiAnime.themes,
+                                    demographics: apiAnime.demographics,
+                                    trailer: apiAnime.trailer
+                                };
+                            }
+                        }
+                    } else if (response.status === 429) {
+                        console.log('Rate limited by API (search)');
+                    }
+                } else {
+                    // If malId exists, try to enrich cover from apiData if present
+                    if (anime.apiData && anime.apiData.images) {
+                        considerCandidate(anime.apiData.images?.webp?.large_image_url, 'webp_large');
+                        considerCandidate(anime.apiData.images?.webp?.image_url, 'webp');
+                        considerCandidate(anime.apiData.images?.jpg?.large_image_url, 'jpg_large');
+                        considerCandidate(anime.apiData.images?.jpg?.image_url, 'jpg');
+                    }
+                }
+
+                // Fetch gallery pictures for more variety if we have mal_id
+                if (malId) {
+                    console.log(`Fetching gallery pictures for mal_id=${malId}`);
+                    try {
+                        let attempts = 0;
+                        while (attempts < 2) {
+                            const picsResp = await fetch(`https://api.jikan.moe/v4/anime/${malId}/pictures`);
+                            if (picsResp.status === 429) {
+                                attempts += 1;
+                                await sleep(800);
+                                continue;
+                            }
+                            if (!picsResp.ok) break;
+                            const picsData = await picsResp.json();
+                            const pics = Array.isArray(picsData?.data) ? picsData.data : [];
+                            for (const pic of pics) {
+                                const wLarge = pic?.images?.webp?.large_image_url || pic?.webp?.large_image_url;
+                                const w = pic?.images?.webp?.image_url || pic?.webp?.image_url;
+                                const jLarge = pic?.images?.jpg?.large_image_url || pic?.jpg?.large_image_url;
+                                const j = pic?.images?.jpg?.image_url || pic?.jpg?.image_url;
+                                considerCandidate(wLarge, 'webp_large');
+                                considerCandidate(w, 'webp');
+                                considerCandidate(jLarge, 'jpg_large');
+                                considerCandidate(j, 'jpg');
+                                if (imageMap.size >= 20) break; // light cap on unique items before building final list
+                            }
+                            break;
+                        }
+                    } catch (e) {
+                        console.warn('Failed to fetch gallery pictures', e);
+                    }
+                }
+            } catch (error) {
+                console.warn(`Failed to get images for ${anime.title}:`, error);
+            }
+            
+            // Build final list: best per key, sorted by rank (best first), capped
+            const uniqueImages = Array.from(imageMap.values())
+                .sort((a, b) => b.rank - a.rank)
+                .map(v => v.url)
+                .slice(0, 15);
+            
+            if (uniqueImages.length > 0) {
+                anime.images = uniqueImages;
+                anime.currentImageIndex = 0;
+                anime.galleryAugmented = true;
+                console.log(`Loaded ${uniqueImages.length} images for: ${anime.title}`);
+                // Warm browser cache: prefetch all images
+                try {
+                    for (const u of uniqueImages) {
+                        const img = new Image();
+                        img.src = u;
+                    }
+                } catch (_) {}
+                // If card is currently visible, re-render to reflect new images/count
+                const cardEl = document.getElementById('animeCard');
+                if (cardEl && cardEl.style.display !== 'none') {
+                    try { displayAnime(anime); } catch (_) {}
+                }
+                return anime.images;
+            }
+            
+            // Fallback to placeholder image
+            const fallbackImage = `https://via.placeholder.com/200x280/4a69bd/ffffff?text=${encodeURIComponent(anime.title.split(' ').slice(0, 2).join(' '))}`;
+            anime.images = [fallbackImage];
+            anime.currentImageIndex = 0;
+            anime.galleryAugmented = true;
+            try { const img = new Image(); img.src = fallbackImage; } catch (_) {}
+            // Re-render if card is visible
+            const cardEl2 = document.getElementById('animeCard');
+            if (cardEl2 && cardEl2.style.display !== 'none') {
+                try { displayAnime(anime); } catch (_) {}
+            }
+            return anime.images;
+        }
+
+        // Parse anime data from text file format (legacy fallback)
+        function parseAnimeData(text) {
+            const lines = text.split('\n');
+            const anime = [];
+            let current = {};
+            
+            for (let line of lines) {
+                line = line.trim();
+                if (!line || line.startsWith('WINTER 2025') || line.startsWith('Rating >') || line.startsWith('TOTAL:') || line.startsWith('[Continue')) continue;
+                
+                // New anime entry
+                if (/^\d+\.\s/.test(line)) {
+                    if (current.title) {
+                        anime.push(current);
+                    }
+                    current = {
+                        title: line.replace(/^\d+\.\s/, '').trim(),
+                        genres: []
+                    };
+                }
+                // Rating, popularity, episodes (format: "Rating: 8.70 | Popularity: 617K | Episodes: 13")
+                else if (line.includes('Rating:') && line.includes('Popularity:') && line.includes('Episodes:')) {
+                    const ratingMatch = line.match(/Rating:\s*([\d.]+)/);
+                    const popularityMatch = line.match(/Popularity:\s*([^|]+)/);
+                    const episodesMatch = line.match(/Episodes:\s*(\d+)/);
+                    
+                    if (ratingMatch) current.rating = parseFloat(ratingMatch[1]);
+                    if (popularityMatch) current.popularity = popularityMatch[1].trim();
+                    if (episodesMatch) current.episodes = parseInt(episodesMatch[1]);
+                }
+                // Genres
+                else if (line.startsWith('Genres:')) {
+                    const genresText = line.replace('Genres:', '').trim();
+                    current.genres = genresText.split(',').map(g => g.trim());
+                }
+                // Description
+                else if (line.startsWith('Description:')) {
+                    current.description = line.replace('Description:', '').trim();
+                }
+                // Image (skip - will be loaded on demand)
+                else if (line.startsWith('Image:')) {
+                    // current.image = line.replace('Image:', '').trim();
+                    current.image = null; // Will be loaded on demand
+                }
+                // Link
+                else if (line.startsWith('Link:')) {
+                    current.link = line.replace('Link:', '').trim();
+                }
+            }
+            
+            // Add last anime
+            if (current.title) {
+                anime.push(current);
+            }
+            
+            return anime;
+        }
+
+        async function pickRandomAnime() {
+            if ((filteredAnimeList.length || animeList.length) === 0) {
+                alert('No anime data loaded! Please load a season first.');
+                return;
+            }
+            
+            const loadingEl = document.getElementById('loading');
+            const cardEl = document.getElementById('animeCard');
+            const pickButton = document.getElementById('pickButton');
+            
+            // Disable button and show loading
+            pickButton.disabled = true;
+            pickButton.textContent = '🔄 Loading...';
+            loadingEl.style.display = 'block';
+            cardEl.style.display = 'none';
+            
+            try {
+                // Wait a bit for better UX
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                const anyFilterActive = (
+                    activeTypeFilters !== null ||
+                    activeGenreFilters !== null ||
+                    activeEpisodeFilters !== null ||
+                    excludeShorts === true ||
+                    typeof minDurationMin === 'number' ||
+                    typeof maxDurationMin === 'number'
+                );
+                let source = animeList;
+                if (anyFilterActive) {
+                    if (filteredAnimeList.length === 0) {
+                        alert('No titles match your current filters. Adjust filters and try again.');
+                        return;
+                    }
+                    source = filteredAnimeList;
+                } else if (filteredAnimeList.length > 0) {
+                    // No active filters but filtered list exists (e.g., from previous run)
+                    source = filteredAnimeList;
+                }
+                // Respect the "Include continuations" setting at pick-time only
+                const selectedAnime = await pickRandomConsideringContinuity(source);
+                
+                // Load image on demand
+                await loadAnimeImage(selectedAnime);
+                
+                // Display the anime with loaded image
+                displayAnime(selectedAnime);
+                
+                loadingEl.style.display = 'none';
+                cardEl.style.display = 'block';
+                
+                cardEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            } catch (error) {
+                console.error('Error picking anime:', error);
+                alert('Error loading anime. Please try again.');
+            } finally {
+                // Re-enable button
+                pickButton.disabled = false;
+                pickButton.textContent = '🎲 Pick Random Anime';
+            }
+        }
+
+        function displayAnime(anime) {
+            const cardEl = document.getElementById('animeCard');
+            
+            const genreTags = anime.genres.map(genre => 
+                `<span class="genre-tag">${genre}</span>`
+            ).join('');
+            
+            // Use API title if available, otherwise use file data title
+            const displayTitle = anime.apiData?.title || anime.title;
+            const malLink = anime.apiData?.url || anime.link;
+            
+            // Build API details section if we have API data
+            let apiDetailsHTML = '';
+            if (anime.apiData) {
+                const api = anime.apiData;
+                
+                // Helper function to format arrays
+                const formatArray = (arr, type = 'name') => {
+                    if (!arr || arr.length === 0) return '<span class="api-value">N/A</span>';
+                    return `<div class="tag-list">${arr.map(item => 
+                        `<span class="api-tag">${item[type] || item.name || item}</span>`
+                    ).join('')}</div>`;
+                };
+                
+                // Format aired dates
+                const formatAired = (aired) => {
+                    if (!aired) return 'N/A';
+                    const from = aired.from ? new Date(aired.from).toLocaleDateString() : 'N/A';
+                    const to = aired.to ? new Date(aired.to).toLocaleDateString() : 'Ongoing';
+                    return `${from} - ${to}`;
+                };
+                
+                apiDetailsHTML = `
+                    <div class="api-details">
+                                              
+                        <div class="api-section">
+                            <h3>📈 Statistics</h3>
+                            <div class="api-grid">
+                                ${api.score ? `
+                                    <div class="api-item">
+                                        <div class="api-label">MAL Score</div>
+                                        <div class="api-value">⭐ ${api.score}/10</div>
+                                    </div>
+                                ` : ''}
+                                ${api.scored_by ? `
+                                    <div class="api-item">
+                                        <div class="api-label">Scored By</div>
+                                        <div class="api-value">${api.scored_by.toLocaleString()} users</div>
+                                    </div>
+                                ` : ''}
+                                ${api.rank ? `
+                                    <div class="api-item">
+                                        <div class="api-label">Rank</div>
+                                        <div class="api-value">#${api.rank}</div>
+                                    </div>
+                                ` : ''}
+                                ${api.popularity ? `
+                                    <div class="api-item">
+                                        <div class="api-label">Popularity Rank</div>
+                                        <div class="api-value">#${api.popularity}</div>
+                                    </div>
+                                ` : ''}
+                                ${api.members ? `
+                                    <div class="api-item">
+                                        <div class="api-label">Members</div>
+                                        <div class="api-value">${api.members.toLocaleString()}</div>
+                                    </div>
+                                ` : ''}
+                                ${api.favorites ? `
+                                    <div class="api-item">
+                                        <div class="api-label">Favorites</div>
+                                        <div class="api-value">❤️ ${api.favorites.toLocaleString()}</div>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        </div>
+                        
+                        ${api.synopsis ? `
+                            <div class="api-section">
+                                <h3>📝 Synopsis</h3>
+                                <div class="synopsis-text">${api.synopsis}</div>
+                            </div>
+                        ` : ''}
+                        
+                        ${api.background ? `
+                            <div class="api-section">
+                                <h3>🎬 Background</h3>
+                                <div class="synopsis-text">${api.background}</div>
+                            </div>
+                        ` : ''}
+                        
+                        ${api.studios && api.studios.length > 0 ? `
+                            <div class="api-section">
+                                <h3>🏢 Studios</h3>
+                                ${formatArray(api.studios)}
+                            </div>
+                        ` : ''}
+                        
+                        ${api.producers && api.producers.length > 0 ? `
+                            <div class="api-section">
+                                <h3>🎭 Producers</h3>
+                                ${formatArray(api.producers)}
+                            </div>
+                        ` : ''}
+                        
+                        ${api.licensors && api.licensors.length > 0 ? `
+                            <div class="api-section">
+                                <h3>📺 Licensors</h3>
+                                ${formatArray(api.licensors)}
+                            </div>
+                        ` : ''}
+                        
+                        ${api.genres && api.genres.length > 0 ? `
+                            <div class="api-section">
+                                <h3>🎯 Genres (API)</h3>
+                                ${formatArray(api.genres)}
+                            </div>
+                        ` : ''}
+                        
+                        ${api.themes && api.themes.length > 0 ? `
+                            <div class="api-section">
+                                <h3>🎨 Themes</h3>
+                                ${formatArray(api.themes)}
+                            </div>
+                        ` : ''}
+                        
+                        ${api.demographics && api.demographics.length > 0 ? `
+                            <div class="api-section">
+                                <h3>👥 Demographics</h3>
+                                ${formatArray(api.demographics)}
+                            </div>
+                        ` : ''}
+                        
+                        ${api.explicit_genres && api.explicit_genres.length > 0 ? `
+                            <div class="api-section">
+                                <h3>🔞 Explicit Genres</h3>
+                                ${formatArray(api.explicit_genres)}
+                            </div>
+                        ` : ''}
+                         <div class="api-section">
+                            <h3>📊 Detailed Information from MyAnimeList</h3>
+                            <div class="api-grid">
+                                ${api.title_english ? `
+                                    <div class="api-item">
+                                        <div class="api-label">English Title</div>
+                                        <div class="api-value">${api.title_english}</div>
+                                    </div>
+                                ` : ''}
+                                ${api.title_japanese ? `
+                                    <div class="api-item">
+                                        <div class="api-label">Japanese Title</div>
+                                        <div class="api-value">${api.title_japanese}</div>
+                                    </div>
+                                ` : ''}
+                                ${api.type ? `
+                                    <div class="api-item">
+                                        <div class="api-label">Type</div>
+                                        <div class="api-value">${api.type}</div>
+                                    </div>
+                                ` : ''}
+                                ${api.source ? `
+                                    <div class="api-item">
+                                        <div class="api-label">Source</div>
+                                        <div class="api-value">${api.source}</div>
+                                    </div>
+                                ` : ''}
+                                ${api.status ? `
+                                    <div class="api-item">
+                                        <div class="api-label">Status</div>
+                                        <div class="api-value">${api.status}</div>
+                                    </div>
+                                ` : ''}
+                                ${api.aired ? `
+                                    <div class="api-item">
+                                        <div class="api-label">Aired</div>
+                                        <div class="api-value">${formatAired(api.aired)}</div>
+                                    </div>
+                                ` : ''}
+                                ${api.duration ? `
+                                    <div class="api-item">
+                                        <div class="api-label">Duration</div>
+                                        <div class="api-value">${api.duration}</div>
+                                    </div>
+                                ` : ''}
+                                ${api.rating ? `
+                                    <div class="api-item">
+                                        <div class="api-label">Age Rating</div>
+                                        <div class="api-value">${api.rating}</div>
+                                    </div>
+                                ` : ''}
+                                ${api.season && api.year ? `
+                                    <div class="api-item">
+                                        <div class="api-label">Season</div>
+                                        <div class="api-value">${api.season} ${api.year}</div>
+                                    </div>
+                                ` : ''}
+                                ${api.broadcast && api.broadcast.string ? `
+                                    <div class="api-item">
+                                        <div class="api-label">Broadcast</div>
+                                        <div class="api-value">${api.broadcast.string}</div>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                apiDetailsHTML = `
+                    <div class="no-api-data">
+                        <p>🔍 No additional API data available for this anime.</p>
+                        <p>This might happen if the anime is very new or not found in the MyAnimeList database.</p>
+                    </div>
+                `;
+            }
+            
+            currentDisplayedAnime = anime;
+            cardEl.innerHTML = `
+                <div class="anime-header">
+                    <div class="anime-title">${displayTitle}</div>
+                    <div class="anime-stats">
+                        <div class="stat">
+                            <div class="stat-value">⭐ ${anime.rating}</div>
+                            <div class="stat-label">Rating</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value">👥 ${anime.popularity}</div>
+                            <div class="stat-label">Popularity</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value">📺 ${anime.episodes}</div>
+                            <div class="stat-label">Episodes</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="anime-content">
+                    <div class="anime-image-container">
+                        <div class="image-loading-overlay active"><div class="image-spinner"></div></div>
+                        <img src="${anime.images[anime.currentImageIndex]}" alt="${displayTitle}" class="anime-image" 
+                             onclick="cycleImage()"
+                             onerror="this.src='https://via.placeholder.com/200x280/4a69bd/ffffff?text=${encodeURIComponent(displayTitle.split(' ').slice(0, 2).join(' '))}'; this.onerror=null;">
+                        <div class="image-counter">${anime.currentImageIndex + 1} / ${anime.images.length}</div>
+                    </div>
+                    <div class="anime-details">
+                        <div class="genres">
+                            ${genreTags}
+                        </div>
+                        <div class="anime-actions">
+                            ${anime.apiData && anime.apiData.trailer && anime.apiData.trailer.url ? `
+                                <a href="${anime.apiData.trailer.url}" target="_blank" class="trailer-link">
+                                    🎬 Watch Trailer
+                                </a>
+                            ` : ''}
+                            <a href="${malLink}" target="_blank" class="mal-link">
+                                View on MyAnimeList
+                            </a>
+                        </div>
+                    </div>
+                    ${apiDetailsHTML}
+                </div>
+            `;
+            // Manage initial spinner: hide when first image loads or is already cached
+            try {
+                const imgEl = cardEl.querySelector('.anime-image');
+                const overlayEl = cardEl.querySelector('.image-loading-overlay');
+                if (imgEl && overlayEl) {
+                    const hide = () => overlayEl.classList.remove('active');
+                    if (imgEl.complete && imgEl.naturalWidth > 0) {
+                        hide();
+                    } else {
+                        overlayEl.classList.add('active');
+                        imgEl.addEventListener('load', hide, { once: true });
+                        imgEl.addEventListener('error', hide, { once: true });
+                    }
+                }
+            } catch (_) {}
+        }
+
+        // Function to cycle through images when clicked
+        function cycleImage() {
+            const anime = currentDisplayedAnime;
+            if (!anime || !anime.images || anime.images.length <= 1) return;
+            
+            const nextIndex = (anime.currentImageIndex + 1) % anime.images.length;
+            const imgElement = document.querySelector('.anime-image');
+            const counterElement = document.querySelector('.image-counter');
+            const overlay = document.querySelector('.image-loading-overlay');
+            if (!imgElement || !counterElement) return;
+
+            const nextUrl = anime.images[nextIndex];
+            const tempImg = new Image();
+            if (overlay) overlay.classList.add('active');
+            tempImg.onload = () => {
+                anime.currentImageIndex = nextIndex;
+                imgElement.src = nextUrl;
+                counterElement.textContent = `${anime.currentImageIndex + 1} / ${anime.images.length}`;
+                if (overlay) overlay.classList.remove('active');
+            };
+            tempImg.onerror = () => {
+                // skip broken and try next
+                if (overlay) overlay.classList.remove('active');
+                anime.currentImageIndex = nextIndex;
+                counterElement.textContent = `${anime.currentImageIndex + 1} / ${anime.images.length}`;
+            };
+            tempImg.src = nextUrl;
+        }
+
+        // Initialize the app when page loads
+        window.addEventListener('DOMContentLoaded', () => {
+            // Initialize controls and load default season, then apply filters once after UI builds
+            initializeSeasonControls()
+                .then(() => loadSeasonData(selectedYear, selectedSeason))
+                .then(() => {
+                    applyFilters();
+                });
+
+            // Bind static filters
+            bindContinuityFilter();
+
+            // Toggle sidebar
+            const toggleBtn = document.getElementById('toggleSidebarBtn');
+            toggleBtn.addEventListener('click', () => {
+                isSidebarCollapsed = !isSidebarCollapsed;
+                document.body.classList.toggle('sidebar-collapsed', isSidebarCollapsed);
+                toggleBtn.setAttribute('aria-expanded', String(!isSidebarCollapsed));
+            });
+        });
+    </script>
+</body>
+</html>
+
