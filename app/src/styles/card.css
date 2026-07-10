@@ -204,7 +204,6 @@
 }
 
 .api-details {
-  clear: both;
   margin-top: 2rem;
   padding: 1.5rem;
   background: #f8f9fa;
@@ -267,6 +266,7 @@
 }
 
 .synopsis-text {
+  clear: both;
   line-height: 1.6;
   text-align: justify;
   max-height: 200px;
