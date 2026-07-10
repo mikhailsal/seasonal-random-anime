@@ -204,6 +204,7 @@
 }
 
 .api-details {
+  clear: both;
   margin-top: 2rem;
   padding: 1.5rem;
   background: #f8f9fa;
