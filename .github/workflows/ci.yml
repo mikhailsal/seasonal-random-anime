@@ -64,8 +64,10 @@ jobs:
 
   integration:
     name: Integration tests
-    # Run on schedule, or when manually triggered with input flag
+    # Run on schedule, or when manually triggered with input flag.
+    # External Jikan API outages must not paint the commit red.
     if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.run_integration == 'true')
+    continue-on-error: true
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
