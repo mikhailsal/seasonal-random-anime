@@ -12,12 +12,84 @@ function backoffMs(attempt, baseDelayMs, jitter, maxDelayMs) {
   return Math.min(exponential + Math.floor(Math.random() * baseDelayMs), maxDelayMs);
 }
 
-function httpError(status) {
-  return new Error(status === 429 ? 'HTTP 429 Too Many Requests' : `HTTP ${status}`);
+export function parseRetryAfterHeader(headerValue) {
+  if (!headerValue) return undefined;
+  const seconds = parseFloat(headerValue);
+  if (!isNaN(seconds) && seconds >= 0) {
+    return Math.ceil(seconds * 1000);
+  }
+  const dateMs = Date.parse(headerValue);
+  if (!isNaN(dateMs)) {
+    const diff = dateMs - Date.now();
+    return diff > 0 ? diff : 0;
+  }
+  return undefined;
+}
+
+export async function parseResponseError(res) {
+  const status = res.status;
+  const statusText = res.statusText;
+  const effectiveStatusText = statusText || (status === 429 ? 'Too Many Requests' : '');
+
+  let responseBody = undefined;
+  let detailMessage = null;
+
+  try {
+    const text = await res.clone().text();
+    if (text) {
+      try {
+        const json = JSON.parse(text);
+        responseBody = json;
+        const message = typeof json.message === 'string' && json.message.trim() ? json.message.trim() : null;
+        const error = typeof json.error === 'string' && json.error.trim() ? json.error.trim() : null;
+        const type = typeof json.type === 'string' && json.type.trim() ? json.type.trim() : null;
+
+        if (
+          message &&
+          error &&
+          message !== error &&
+          error !== statusText &&
+          error !== effectiveStatusText
+        ) {
+          detailMessage = `${error} - ${message}`;
+        } else if (message) {
+          detailMessage = message;
+        } else if (error && error !== effectiveStatusText) {
+          detailMessage = error;
+        } else if (type) {
+          detailMessage = type;
+        }
+      } catch {
+        const cleanText = text.replace(/<[^>]*>/g, '').trim();
+        if (cleanText && cleanText.length > 0 && cleanText.length < 300) {
+          detailMessage = cleanText;
+        }
+      }
+    }
+  } catch {
+    // Ignore error reading body
+  }
+
+  let fullMessage;
+  if (detailMessage) {
+    fullMessage = effectiveStatusText
+      ? `HTTP ${status} ${effectiveStatusText}: ${detailMessage}`
+      : `HTTP ${status}: ${detailMessage}`;
+  } else {
+    fullMessage = effectiveStatusText
+      ? `HTTP ${status} ${effectiveStatusText}`
+      : `HTTP ${status}`;
+  }
+
+  const err = new Error(fullMessage);
+  err.status = status;
+  err.statusText = statusText;
+  err.responseBody = responseBody;
+  return err;
 }
 
 /**
- * Fetch JSON with timeout, selective retries, and exponential backoff.
+ * Fetch JSON with timeout, selective retries, exponential backoff, and rate limit respect.
  * Retries only on configured statuses (default 429/502/503/504) and network errors.
  * Non-retryable HTTP statuses (e.g. 404) fail immediately. Timeouts (AbortError) are not retried.
  *
@@ -61,7 +133,8 @@ export async function fetchWithRetry(
         return await res.json();
       }
 
-      const err = httpError(res.status);
+      const retryAfterMs = parseRetryAfterHeader(res.headers?.get?.('retry-after'));
+      const err = await parseResponseError(res);
       lastErr = err;
 
       if (!retryOn.includes(res.status) || attempt === retries) {
@@ -70,7 +143,10 @@ export async function fetchWithRetry(
 
       onRetry?.(attempt + 1, err);
       const base = res.status >= 500 ? serverErrorBaseDelayMs : baseDelayMs;
-      await delay(backoffMs(attempt, base, jitter, maxDelayMs));
+      const calculatedBackoff = backoffMs(attempt, base, jitter, maxDelayMs);
+      const min429Delay = res.status === 429 && baseDelayMs >= 100 ? 1000 : 0;
+      const delayMs = Math.max(calculatedBackoff, retryAfterMs ?? 0, min429Delay);
+      await delay(delayMs);
     } catch (e) {
       if (isAbortError(e)) {
         const abort = new Error('timeout');
@@ -79,7 +155,7 @@ export async function fetchWithRetry(
       }
 
       // Non-retryable / exhausted HTTP errors thrown above.
-      if (e instanceof Error && e.message.startsWith('HTTP ')) {
+      if (e instanceof Error && (e.status || e.message.startsWith('HTTP '))) {
         throw e;
       }
 
@@ -87,7 +163,8 @@ export async function fetchWithRetry(
       if (attempt === retries) break;
 
       onRetry?.(attempt + 1, lastErr);
-      await delay(backoffMs(attempt, baseDelayMs, jitter, maxDelayMs));
+      const calculatedBackoff = backoffMs(attempt, baseDelayMs, jitter, maxDelayMs);
+      await delay(calculatedBackoff);
     } finally {
       clearTimeout(timer);
     }
