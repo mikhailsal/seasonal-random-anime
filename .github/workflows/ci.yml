@@ -10,8 +10,6 @@ on:
         description: "Run integration tests (hits Jikan API)"
         default: "false"
         required: false
-  schedule:
-    - cron: "0 3 * * *" # nightly at 03:00 UTC
 
 jobs:
   test:
@@ -64,10 +62,8 @@ jobs:
 
   integration:
     name: Integration tests
-    # Run on schedule, or when manually triggered with input flag.
-    # External Jikan API outages must not paint the commit red.
-    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.run_integration == 'true')
-    continue-on-error: true
+    # Run when manually triggered with input flag
+    if: github.event_name == 'workflow_dispatch' && inputs.run_integration == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
