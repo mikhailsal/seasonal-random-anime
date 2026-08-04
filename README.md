@@ -2,6 +2,8 @@
 
 Single-page app that fetches seasonal anime via the public Jikan (MyAnimeList) v4 API, applies filters, and picks a random title. Initially implemented as a single static HTML file, with tests and CI set up for reliability and future refactoring.
 
+![App Interface](docs/screenshot.png)
+
 - App entry: `seasonal-random-anime/index.html`
 - Live site: [React app](https://mikhailsal.github.io/seasonal-random-anime/)
 - Legacy app: [Vanilla HTML version](https://mikhailsal.github.io/seasonal-random-anime/legacy/)
@@ -40,7 +42,7 @@ npm run test:integration
 
 Run full suite:
 ```bash
-npm test
+npm run test
 ```
 
 ## Testing Notes
@@ -53,7 +55,7 @@ npm test
 ## Continuous Integration
 - Workflow: `.github/workflows/ci.yml`
   - Unit tests run on push and pull_request.
-  - Integration tests are gated to avoid rate limits; they run nightly at 03:00 UTC or manually via workflow_dispatch with input `run_integration = true`.
+  - Integration tests are gated to avoid rate limits; they run manually via workflow_dispatch with input `run_integration = true`.
 
 Scripts:
 - `npm run test:unit` → `vitest --run test/unit`
