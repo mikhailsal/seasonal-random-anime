@@ -52,10 +52,12 @@ npm run test
   - `GET /v4/seasons`
   - `GET /v4/seasons/{year}/{season}?page={n}&limit={k}`
 
-## Continuous Integration
+## Continuous Integration & Git Hooks
 - Workflow: `.github/workflows/ci.yml`
-  - Unit tests run on push and pull_request.
+  - Runs ESLint, Prettier format check, strict TypeScript typecheck, coverage gate (>=80%), and E2E Playwright tests.
   - Integration tests are gated to avoid rate limits; they run manually via workflow_dispatch with input `run_integration = true`.
+- Pre-commit Git Hooks:
+  - Automated via `.githooks/pre-commit` (configured automatically via `npm run prepare`). Runs lint, format, typecheck, and unit tests prior to commits.
 
 Scripts:
 - `npm run test:unit` → `vitest --run test/unit`

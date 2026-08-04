@@ -1,0 +1,21 @@
+#!/bin/sh
+set -e
+
+echo "🔍 Running pre-commit quality checks..."
+
+echo "1/5 Linting app..."
+npm run lint --prefix app
+
+echo "2/5 Checking app formatting..."
+npm run format --prefix app
+
+echo "3/5 Typechecking app..."
+npm run typecheck --prefix app
+
+echo "4/5 Running app unit tests..."
+npm test --prefix app -- --run
+
+echo "5/5 Running root unit tests..."
+npm test -- --run
+
+echo "✅ All pre-commit quality checks passed!"

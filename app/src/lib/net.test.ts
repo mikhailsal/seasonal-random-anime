@@ -1,7 +1,11 @@
 import { fetchWithRetry, parseResponseError, parseRetryAfterHeader, HttpError } from './net';
 import type { FetchLike } from './net';
 
-function jsonResponse(status: number, body: unknown = {}, headers: Record<string, string> = {}): Response {
+function jsonResponse(
+  status: number,
+  body: unknown = {},
+  headers: Record<string, string> = {}
+): Response {
   return new Response(JSON.stringify(body), { status, headers });
 }
 
@@ -30,7 +34,11 @@ describe('fetchWithRetry', () => {
 
   it('throws detailed HTTP error after exhausting retries on retryable status', async () => {
     const fetchImpl: FetchLike = vi.fn().mockResolvedValue(
-      jsonResponse(503, { status: 503, type: 'ServiceUnavailable', message: 'Jikan API is under maintenance' })
+      jsonResponse(503, {
+        status: 503,
+        type: 'ServiceUnavailable',
+        message: 'Jikan API is under maintenance'
+      })
     );
     await expect(
       fetchWithRetry('https://x.test/', { fetchImpl, retries: 2, baseDelayMs: 1 })
@@ -39,10 +47,12 @@ describe('fetchWithRetry', () => {
   });
 
   it('does not retry on plain 404 and includes details', async () => {
-    const fetchImpl: FetchLike = vi.fn().mockResolvedValue(
-      jsonResponse(404, { message: 'Anime not found' })
+    const fetchImpl: FetchLike = vi
+      .fn()
+      .mockResolvedValue(jsonResponse(404, { message: 'Anime not found' }));
+    await expect(fetchWithRetry('https://x.test/', { fetchImpl })).rejects.toThrow(
+      'HTTP 404: Anime not found'
     );
-    await expect(fetchWithRetry('https://x.test/', { fetchImpl })).rejects.toThrow('HTTP 404: Anime not found');
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
@@ -80,7 +90,9 @@ describe('fetchWithRetry', () => {
   it('respects Retry-After headers when retrying on 429', async () => {
     const fetchImpl = vi
       .fn<FetchLike>()
-      .mockResolvedValueOnce(jsonResponse(429, { message: 'You are being rate limited.' }, { 'retry-after': '1' }))
+      .mockResolvedValueOnce(
+        jsonResponse(429, { message: 'You are being rate limited.' }, { 'retry-after': '1' })
+      )
       .mockResolvedValueOnce(jsonResponse(200));
     const start = Date.now();
     const res = await fetchWithRetry('https://x.test/', {
@@ -130,7 +142,9 @@ describe('parseResponseError', () => {
   });
 
   it('handles HTML/text fallback responses', async () => {
-    const res = new Response('<html><body>Service Temporarily Unavailable</body></html>', { status: 503 });
+    const res = new Response('<html><body>Service Temporarily Unavailable</body></html>', {
+      status: 503
+    });
     const err = await parseResponseError(res);
     expect(err.message).toBe('HTTP 503: Service Temporarily Unavailable');
   });

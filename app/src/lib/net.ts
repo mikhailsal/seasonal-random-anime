@@ -18,8 +18,8 @@ export interface FetchWithRetryOptions {
 
 export class HttpError extends Error {
   readonly status: number;
-  readonly statusText?: string;
-  readonly responseBody?: unknown;
+  readonly statusText: string | undefined;
+  readonly responseBody: unknown;
 
   constructor(status: number, message: string, statusText?: string, responseBody?: unknown) {
     super(message);
@@ -32,7 +32,7 @@ export class HttpError extends Error {
 
 type AttemptResult =
   | { ok: true; response: Response }
-  | { ok: false; reason: Error; retryable: boolean; retryAfterMs?: number };
+  | { ok: false; reason: Error; retryable: boolean; retryAfterMs?: number | undefined };
 
 interface AttemptContext {
   fetchImpl: FetchLike;
@@ -76,60 +76,79 @@ export function parseRetryAfterHeader(headerValue: string | null | undefined): n
   return undefined;
 }
 
+interface ParsedJsonError {
+  message: string | null;
+  error: string | null;
+  type: string | null;
+}
+
+function extractJsonFields(
+  text: string
+): { json: Record<string, unknown>; fields: ParsedJsonError } | null {
+  try {
+    const json = JSON.parse(text) as Record<string, unknown>;
+    const message =
+      typeof json.message === 'string' && json.message.trim() ? json.message.trim() : null;
+    const error = typeof json.error === 'string' && json.error.trim() ? json.error.trim() : null;
+    const type = typeof json.type === 'string' && json.type.trim() ? json.type.trim() : null;
+    return { json, fields: { message, error, type } };
+  } catch {
+    return null;
+  }
+}
+
+function formatJsonError(
+  fields: ParsedJsonError,
+  statusText: string,
+  effectiveStatusText: string
+): string | null {
+  const { message, error, type } = fields;
+  if (
+    message &&
+    error &&
+    message !== error &&
+    error !== statusText &&
+    error !== effectiveStatusText
+  ) {
+    return `${error} - ${message}`;
+  }
+  if (message) return message;
+  if (error && error !== effectiveStatusText) return error;
+  return type;
+}
+
+function cleanTextError(text: string): string | null {
+  const cleanText = text.replace(/<[^>]*>/g, '').trim();
+  return cleanText.length > 0 && cleanText.length < 300 ? cleanText : null;
+}
+
 export async function parseResponseError(response: Response): Promise<HttpError> {
   const status = response.status;
   const statusText = response.statusText;
   const effectiveStatusText = statusText || (status === 429 ? 'Too Many Requests' : '');
 
-  let responseBody: unknown = undefined;
+  let responseBody: unknown;
   let detailMessage: string | null = null;
 
   try {
     const text = await response.clone().text();
     if (text) {
-      try {
-        const json = JSON.parse(text) as Record<string, unknown>;
-        responseBody = json;
-        const message = typeof json.message === 'string' && json.message.trim() ? json.message.trim() : null;
-        const error = typeof json.error === 'string' && json.error.trim() ? json.error.trim() : null;
-        const type = typeof json.type === 'string' && json.type.trim() ? json.type.trim() : null;
-
-        if (
-          message &&
-          error &&
-          message !== error &&
-          error !== statusText &&
-          error !== effectiveStatusText
-        ) {
-          detailMessage = `${error} - ${message}`;
-        } else if (message) {
-          detailMessage = message;
-        } else if (error && error !== effectiveStatusText) {
-          detailMessage = error;
-        } else if (type) {
-          detailMessage = type;
-        }
-      } catch {
-        const cleanText = text.replace(/<[^>]*>/g, '').trim();
-        if (cleanText && cleanText.length > 0 && cleanText.length < 300) {
-          detailMessage = cleanText;
-        }
+      const parsed = extractJsonFields(text);
+      if (parsed) {
+        responseBody = parsed.json;
+        detailMessage = formatJsonError(parsed.fields, statusText, effectiveStatusText);
+      } else {
+        detailMessage = cleanTextError(text);
       }
     }
   } catch {
     // Ignore error reading response body
   }
 
-  let fullMessage: string;
-  if (detailMessage) {
-    fullMessage = effectiveStatusText
-      ? `HTTP ${status} ${effectiveStatusText}: ${detailMessage}`
-      : `HTTP ${status}: ${detailMessage}`;
-  } else {
-    fullMessage = effectiveStatusText
-      ? `HTTP ${status} ${effectiveStatusText}`
-      : `HTTP ${status}`;
-  }
+  const prefix = effectiveStatusText
+    ? `HTTP ${String(status)} ${effectiveStatusText}`
+    : `HTTP ${String(status)}`;
+  const fullMessage = detailMessage ? `${prefix}: ${detailMessage}` : prefix;
 
   return new HttpError(status, fullMessage, statusText, responseBody);
 }
@@ -151,7 +170,7 @@ async function attemptFetch(ctx: AttemptContext): Promise<AttemptResult> {
     const response = await fetchOnce(ctx);
     if (response.ok) return { ok: true, response };
 
-    const retryAfterMs = parseRetryAfterHeader(response.headers?.get?.('retry-after'));
+    const retryAfterMs = parseRetryAfterHeader(response.headers.get('retry-after'));
     const error = await parseResponseError(response);
 
     return {
@@ -212,7 +231,10 @@ export async function fetchWithRetry(
     plan.onRetry?.(attempt, result.reason);
 
     const backoff = backoffMs(attempt, plan.baseDelayMs, plan.jitter);
-    const min429Delay = result.reason instanceof HttpError && result.reason.status === 429 && plan.baseDelayMs >= 100 ? 1000 : 0;
+    const min429Delay =
+      result.reason instanceof HttpError && result.reason.status === 429 && plan.baseDelayMs >= 100
+        ? 1000
+        : 0;
     const delayMs = Math.max(backoff, result.retryAfterMs ?? 0, min429Delay);
     await delay(delayMs);
   }
